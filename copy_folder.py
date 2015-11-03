@@ -72,7 +72,7 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
 
     if __currentDepth == 0:
         if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
-            new_folder = makeFolder(item, path_to, __currentDepth)
+            path_to = makeFolder(item, path_to, __currentDepth)
         else:
             print  '  ' * __currentDepth + 'Top level item is not a folder'
             return
