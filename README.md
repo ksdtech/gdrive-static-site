@@ -20,7 +20,20 @@ python copy_folder.py /Users/pz/Projects/_active/gdrive-static-site/project 0B93
 Some Ideas on Metadata and Site Organization
 ============================================
 
-Manually maintained yaml files to be used in site construction
+Website is organized from these types in Google Drive, organized in a folder tree:
+
+- text/plain documents with titles ending in ".md" are downloaded and used as markdown source
+- text/html documents with titles ending in ".html" are downloaded and used as html source
+- application/vnd.google-apps.document documents are exported as text/html and used as html source
+- application/pdf documents with titles ending in ".pdf" are donwloaded and used as static files
+- text/plain documents with titles ending in ".yaml" are downloaded and used for metdata
+
+Any text/plain or application/vnd.google-apps.document Google Drive documents that have titles 
+that begin with an underscore are treated as resource files. They are downloaded and may be used 
+for inclusion (for example in iframes) but are not rendered as standalone pages.
+
+Currently there are two types of manually maintained yaml files to be used in site construction.
+
 
 navmenu__.yaml
 --------------
@@ -35,6 +48,7 @@ Each submenu or item has a title and a type:
 - pdf - this is a link to a downloadable PDF
 - doc - this is a link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
 - section - this is a link to a folder containing a section__.yaml file
+
 
 section__.yaml
 --------------
