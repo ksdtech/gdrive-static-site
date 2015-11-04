@@ -10,7 +10,8 @@ import yaml
 def getLocalTitle(item):
     local_title = item['title']
     file_type = None
-    local_title = re.sub(r'[^-._a-z0-9]', '_', local_title, flags=re.IGNORECASE).lower()
+    # Hyphenated, lower-case slug
+    local_title = re.sub(r'[^-._a-z0-9]', '-', local_title, flags=re.IGNORECASE).lower()
     if item['kind'] == 'drive#file' and 'exportLinks' in item:
         if item['mimeType'] == 'application/vnd.google-apps.document':
             if 'text/html' in item['exportLinks']:
@@ -48,16 +49,16 @@ def makeFolder(folder_item, path_to, depth):
         'source_id': folder_item['id'],
         'title': folder_item['title'],
         'source_mime_type': folder_item['mimeType'],
-        'modified': folder_item['modifiedDate'],
+        'date': folder_item['createdDate'],
+        'updated': folder_item['modifiedDate'],
         'version': folder_item['version'],
-        'user_name': folder_item['lastModifyingUserName'],
-        'user_email': folder_item['lastModifyingUser']['emailAddress']
+        'author': folder_item['lastModifyingUserName'],
+        'email': folder_item['lastModifyingUser']['emailAddress']
     }
-    meta_file = os.path.join(new_folder, 'meta__.yaml')
+    meta_file = os.path.join(new_folder, '_folder_.yml')
     yaml_meta = yaml.safe_dump(folder_metadata, default_flow_style=False,  explicit_start=True)
     with open(meta_file, 'w+') as f:
         f.write(yaml_meta)
-        f.write("---\n")
 
     return new_folder
 
@@ -109,22 +110,28 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                     with open(new_file, 'w+') as f:
                         f.write(file_content)
 
+                    # Strip off .md or .html
+                    title = re.sub(r'(^_|\.(md|html)$)', '', child['title'], flags=re.IGNORECASE)
+                    # Hyphenated, lower-case slug
+                    slug = re.sub(r'[^-._a-z0-9]', '-', title, flags=re.IGNORECASE).lower()
+
                     file_metadata = {
                         'source_id': child['id'],
-                        'title': child['title'],
+                        'title': title,
+                        'slug': slug,
                         'source_mime_type': child['mimeType'],
                         'exported_mime_type': file_type,
-                        'modified': child['modifiedDate'],
+                        'date': child['createdDate'],
+                        'updated': child['modifiedDate'],
                         'version': child['version'],
-                        'user_name': child['lastModifyingUserName'],
-                        'user_email': child['lastModifyingUser']['emailAddress']
+                        'author': child['lastModifyingUserName'],
+                        'email': child['lastModifyingUser']['emailAddress']
                     }
 
                     yaml_meta = yaml.safe_dump(file_metadata, default_flow_style=False,  explicit_start=True)
-                    meta_file = os.path.join(path_to, 'meta__' + local_title + '.yaml')
+                    meta_file = os.path.join(path_to, '_meta_' + local_title + '.yml')
                     with open(meta_file, 'w+') as f:
                         f.write(yaml_meta)
-                        f.write("---\n")
 
                     print '  ' * (__currentDepth+1) + 'Copied %d bytes to file "%s"' % (bytes_to_copy, local_title)
                 except Exception as e:

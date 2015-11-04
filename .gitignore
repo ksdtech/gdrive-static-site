@@ -1,2 +1,4 @@
-project/*
+node_modules/*
+hexo/*
+pelican/*
 client_secrets.json
