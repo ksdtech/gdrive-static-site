@@ -48,6 +48,7 @@ pelican content
 
 10. Serve site/public folder:
 ```
+emacs /usr/local/etc/apache2/2.4/httpd.conf
 sudo /usr/local/Cellar/httpd24/2.4.12/bin/apachectl start
 ```
 Some Ideas on Metadata and Site Organization

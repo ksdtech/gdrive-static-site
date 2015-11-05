@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 AUTHOR = u'webmaster@kentfieldschools.org'
 SITENAME = u'Kentfield School District'
-SITEURL = 'http://127.0.0.1:8080/ksd'
+SITEURL = 'http://127.0.0.1:8088/ksd'
 
 PATH = 'content'
 
