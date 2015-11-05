@@ -110,10 +110,14 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                     with open(new_file, 'w+') as f:
                         f.write(file_content)
 
-                    # Strip off .md or .html
+                    # Original file name, stripped of .md and .html
                     title = re.sub(r'(^_|\.(md|html)$)', '', child['title'], flags=re.IGNORECASE)
-                    # Hyphenated, lower-case slug
-                    slug = re.sub(r'[^-._a-z0-9]', '-', title, flags=re.IGNORECASE).lower()
+                    # Lower-case slug, stripped of .md and .html
+                    relative_url = slug = re.sub(r'(^_|\.(md|html)$)', '', local_title, flags=re.IGNORECASE)
+
+                    source_mime_type = child['mimeType']
+                    if source_mime_type in ['text/plain', 'text/html']:
+                        relative_url += '.html'
 
                     # Pull description from Google Drive
                     # TODO: if there is '---' at the end of description
@@ -128,8 +132,10 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                         'source_id': child['id'],
                         'title': title,
                         'slug': slug,
+                        'relative_url': relative_url,
                         'summary': description,
-                        'source_mime_type': child['mimeType'],
+                        'source_mime_type': source_mime_type,
+                        'exported_file_name': local_title,
                         'exported_mime_type': file_type,
                         'date': child['createdDate'],
                         'updated': child['modifiedDate'],

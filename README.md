@@ -36,7 +36,7 @@ menu links.
 9. Generate site:
 ```
 cd pelican
-pelican -t ./themes/simple ./content
+pelican -t ./themes/notmyidea ./content
 ```
 
 10. Serve site/public folder:

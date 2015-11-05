@@ -215,13 +215,13 @@ class MarkdownExtReader(MarkdownReader):
         section_links = [ ]
         folder_dir = os.path.dirname(self._source_path)
         meta_files = fnmatch.filter(os.listdir(folder_dir), '_meta_*.yml')
-        for meta_file in meta_files:
-            content_file = re.sub(r'(^_meta_|\.yml$)', '', meta_file)
-            if content_file != self._source_path:
-                yaml_source_path = os.path.join(folder_dir, meta_file)
+        for meta_file_name in meta_files:
+            content_file_name = re.sub(r'(^_meta_|\.yml$)', '', meta_file_name)
+            if content_file_name != metadata['exported_file_name']:
+                yaml_source_path = os.path.join(folder_dir, meta_file_name)
                 with pelican_open(yaml_source_path) as text:
                     info = yaml.load(text)
-                    section_links.append((info['title'], content_file))
+                    section_links.append((info['title'], info['relative_url']))
         return section_links
 
     def read(self, source_path):
