@@ -47,6 +47,8 @@ LOAD_CONTENT_CACHE = False
 # Uncomment following line if you want document-relative URLs when developing
 #RELATIVE_URLS = True
 
+import fnmatch
+import os
 import os.path
 import re
 import yaml
@@ -55,13 +57,78 @@ from markdown import Markdown
 from markdown.inlinepatterns import Pattern
 from markdown.util import etree
 
-from pelican.readers import BaseReader
+from pelican.contents import Content, Page
+from pelican.readers import BaseReader, MarkdownReader
 from pelican.utils import pelican_open
 
+class Section(Page):
+    def __init__(self, *args, **kwargs):
+        super(Section, self).__init__(*args, **kwargs)
+        self._output_location_referenced = False
 
+    @property
+    def url(self):
+        # Note when url has been referenced, so we can avoid overriding it.
+        self._output_location_referenced = True
+        return super(Static, self).url
+
+    @property
+    def save_as(self):
+        # Note when save_as has been referenced, so we can avoid overriding it.
+        self._output_location_referenced = True
+        return super(Static, self).save_as
+
+    def attach_to(self, content):
+        """Override our output directory with that of the given content object.
+        """
+        # Determine our file's new output path relative to the linking document.
+        # If it currently lives beneath the linking document's source directory,
+        # preserve that relationship on output. Otherwise, make it a sibling.
+        linking_source_dir = os.path.dirname(content.source_path)
+        tail_path = os.path.relpath(self.source_path, linking_source_dir)
+        if tail_path.startswith(os.pardir + os.sep):
+            tail_path = os.path.basename(tail_path)
+        new_save_as = os.path.join(
+            os.path.dirname(content.save_as), tail_path)
+
+        # We do not build our new url by joining tail_path with the linking
+        # document's url, because we cannot know just by looking at the latter
+        # whether it points to the document itself or to its parent directory.
+        # (An url like 'some/content' might mean a directory named 'some'
+        # with a file named 'content', or it might mean a directory named
+        # 'some/content' with a file named 'index.html'.) Rather than trying
+        # to figure it out by comparing the linking document's url and save_as
+        # path, we simply build our new url from our new save_as path.
+        new_url = path_to_url(new_save_as)
+
+        def _log_reason(reason):
+            logger.warning("The {attach} link in %s cannot relocate %s "
+                "because %s. Falling back to {filename} link behavior instead.",
+                content.get_relative_source_path(),
+                self.get_relative_source_path(), reason,
+                extra={'limit_msg': "More {attach} warnings silenced."})
+
+        # We never override an override, because we don't want to interfere
+        # with user-defined overrides that might be in EXTRA_PATH_METADATA.
+        if hasattr(self, 'override_save_as') or hasattr(self, 'override_url'):
+            if new_save_as != self.save_as or new_url != self.url:
+                _log_reason("its output location was already overridden")
+            return
+
+        # We never change an output path that has already been referenced,
+        # because we don't want to break links that depend on that path.
+        if self._output_location_referenced:
+            if new_save_as != self.save_as or new_url != self.url:
+                _log_reason("another link already referenced its location")
+            return
+
+        self.override_save_as = new_save_as
+        self.override_url = new_url
+
+
+# Inline include of an external html file.
 # ^snippet.html^
 INCLUDE_HTML_RE = r'(\^)([^\^]+)\2'
-
 
 class IncludeHtmlPattern(Pattern):
     """
@@ -80,71 +147,82 @@ class IncludeHtmlPattern(Pattern):
             el = etree.fromstring(text)
             return el
 
-class MarkdownExtReader(BaseReader):
-    """Reader for Markdown files"""
+class NavMenuReader(BaseReader):
+    """Reader for _navmenu_.yml files"""
+
+    enabled = False
+    file_extensions = ['yml']
+
+    def __init__(self, *args, **kwargs):
+        super(NavMenuReader, self).__init__(*args, **kwargs)
+        self._source_path = None
+
+    def read(self, source_path):
+        """Parse content and metadata of _navmenu_.yml files"""
+
+        content = None
+        metadata = dict()
+        self._source_path = source_path
+        source_file =  os.path.basename(source_path)
+        if source_file == '_navmenu_.yml':
+            with pelican_open(source_path) as text:
+                metadata = yaml.load(text)
+        else:
+            raise Exception("Skipping %s" % source_file)
+        return content, metadata
+
+class MarkdownExtReader(MarkdownReader):
+    """
+    Extended reader for Markdown files. 
+    Also reads metadata from yml files.
+    And adds ^include.html^ pattern.
+    """
 
     enabled = bool(Markdown)
     file_extensions = ['md', 'markdown', 'mkd', 'mdown']
 
     def __init__(self, *args, **kwargs):
         super(MarkdownExtReader, self).__init__(*args, **kwargs)
-        self.extensions = list(self.settings['MD_EXTENSIONS'])
-
-        if 'meta' not in self.extensions:
-            self.extensions.append('meta')
-        self._source_path = None
 
     def _parse_metadata_external(self):
         """Add external yaml metadata"""
         head, source_file =  os.path.split(self._source_path)
         meta_file = '_meta_' + source_file + '.yml'
         yaml_source_path = os.path.join(head, meta_file)
+
+        metadata = dict()
         if os.path.exists(yaml_source_path):
             with pelican_open(yaml_source_path) as text:
-                d = yaml.load(text)
-                # Set slug
-                # if not 'slug' in d:
-                #    d['slug'] = re.sub(r'', d['title'].tolower())
-                # Now clean up dates
-                for name, value in d.items():
-                    d[name] = self.process_metadata(name, value)
-                print "%s -> loaded %r" % (meta_file, d)
-                return d
-        print "%s -> NO METADATA" % meta_file
-        return { }
+                metadata = yaml.load(text)
+                for name, value in metadata.items():
+                    metadata[name] = self.process_metadata(name, value)
+                print "%s -> loaded %r" % (meta_file, metadata)
+        if len(metadata) == 0:
+            print "%s -> NO METADATA" % meta_file
+        return metadata
 
     def _parse_metadata(self, meta):
         """Return the dict containing document metadata"""
         formatted_fields = self.settings['FORMATTED_FIELDS']
 
-        # Add external yaml metadata first
+        # Parse external yaml metadata first
         output = self._parse_metadata_external()
-
-        # Now process inline metadata
-        for name, value in meta.items():
-            name = name.lower()
-            if name in formatted_fields:
-                # formatted metadata is special case and join all list values
-                formatted_values = "\n".join(value)
-                # reset the markdown instance to clear any state
-                self._md.reset()
-                formatted = self._md.convert(formatted_values)
-                output[name] = self.process_metadata(name, formatted)
-            elif name in METADATA_PROCESSORS:
-                if len(value) > 1:
-                    logger.warning(
-                        'Duplicate definition of `%s` '
-                        'for %s. Using first one.',
-                        name, self._source_path)
-                output[name] = self.process_metadata(name, value[0])
-            elif len(value) > 1:
-                # handle list metadata as list of string
-                output[name] = self.process_metadata(name, value)
-            else:
-                # otherwise, handle metadata as single string
-                output[name] = self.process_metadata(name, value[0])
-
+        meta_local = super(MarkdownExtReader, self)._parse_metadata(meta)
+        output.update(meta_local)
         return output
+
+    def _build_section_links(self, metadata):
+        section_links = [ ]
+        folder_dir = os.path.dirname(self._source_path)
+        meta_files = fnmatch.filter(os.listdir(folder_dir), '_meta_*.yml')
+        for meta_file in meta_files:
+            content_file = re.sub(r'(^_meta_|\.yml$)', '', meta_file)
+            if content_file != self._source_path:
+                yaml_source_path = os.path.join(folder_dir, meta_file)
+                with pelican_open(yaml_source_path) as text:
+                    info = yaml.load(text)
+                    section_links.append((info['title'], content_file))
+        return section_links
 
     def read(self, source_path):
         """Parse content and metadata of markdown files"""
@@ -159,7 +237,10 @@ class MarkdownExtReader(BaseReader):
             content = self._md.convert(text)
 
         metadata = self._parse_metadata(self._md.Meta)
+        if 'template' in metadata and metadata['template'] == 'section':
+            metadata['section_links'] = self._build_section_links(metadata)
+
         return content, metadata
 
-READERS = { 'md': MarkdownExtReader }
+READERS = { 'md': MarkdownExtReader, 'yml': NavMenuReader }
 

@@ -35,15 +35,8 @@ menu links.
 
 9. Generate site:
 ```
-cd hexo
-hexo generate
-```
-
-or
-
-```
 cd pelican
-pelican content
+pelican -t ./themes/simple ./content
 ```
 
 10. Serve site/public folder:

@@ -115,10 +115,20 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                     # Hyphenated, lower-case slug
                     slug = re.sub(r'[^-._a-z0-9]', '-', title, flags=re.IGNORECASE).lower()
 
+                    # Pull description from Google Drive
+                    # TODO: if there is '---' at the end of description
+                    #    parse remaining bits as yaml.
+                    description = None
+                    if 'description' in child:
+                        description = child['description'].strip()
+                        if len(description) == 0:
+                            description = None
+
                     file_metadata = {
                         'source_id': child['id'],
                         'title': title,
                         'slug': slug,
+                        'summary': description,
                         'source_mime_type': child['mimeType'],
                         'exported_mime_type': file_type,
                         'date': child['createdDate'],
