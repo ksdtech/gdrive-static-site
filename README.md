@@ -16,12 +16,9 @@ https://github.com/Socialsquare/google-drive-migrator
 
 5. Obtain the id of top level Google Drive folder to copy.
 
-6. Set up hexo:
+6. Install dependencies (PyDrive and html5lib):
 ```
-hexo init site
-cd site
-npm install
-mkdir source/_drafts
+pip install -r requirements.txt
 ```
 
 7. Download files:

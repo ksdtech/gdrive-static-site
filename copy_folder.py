@@ -1,11 +1,15 @@
 #!/usr/bin/python
 
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
-from pprint import pprint as pp
+import codecs
 import os.path
+from pprint import pprint as pp
 import re
 import yaml
+
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+
+from sanitizer import sanitize
 
 def getLocalTitle(item):
     local_title = item['title']
@@ -16,7 +20,6 @@ def getLocalTitle(item):
         if item['mimeType'] == 'application/vnd.google-apps.document':
             if 'text/html' in item['exportLinks']:
                 file_type = 'text/html'
-                local_title += '.html'
 
     print 'localTitle for "%s" kind "%s" mime "%s" ' % (item['title'], item['kind'], item['mimeType'])
     print 'returning "%s" file_type "%s"' % (local_title, file_type)
@@ -57,7 +60,7 @@ def makeFolder(folder_item, path_to, depth):
     }
     meta_file = os.path.join(new_folder, '_folder_.yml')
     yaml_meta = yaml.safe_dump(folder_metadata, default_flow_style=False,  explicit_start=True)
-    with open(meta_file, 'w+') as f:
+    with codecs.open(meta_file, 'w+', 'utf-8') as f:
         f.write(yaml_meta)
 
     return new_folder
@@ -95,7 +98,21 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                 recursiveDownloadInto(gauth, child['id'], new_folder, maxdepth=maxdepth, __currentDepth=__currentDepth+1)
 
             else:
-                new_file = os.path.join(path_to, local_title)
+                append_html = False
+                sanitize_html = False
+                source_mime_type = child['mimeType']
+                if file_type == 'text/html':
+                    append_html = True
+                    sanitize_html = True
+
+                file_name = local_title
+                sanitized_file_name = "_bleached_" + file_name
+                if append_html:
+                    file_name += '.html'
+                    sanitized_file_name += '.html'
+                new_file = os.path.join(path_to, file_name)
+                sanitized_file = os.path.join(path_to, sanitized_file_name)
+
                 exists_check = os.path.exists(new_file)
                 print '  ' * (__currentDepth+1) + 'Trying to download "%s"' % child['title']
                 try:
@@ -110,13 +127,16 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
                     with open(new_file, 'w+') as f:
                         f.write(file_content)
 
+                    if sanitize_html:
+                        sanitized_content = sanitize(file_content)
+                        with codecs.open(sanitized_file, 'w+', 'utf-8') as f:
+                            f.write(sanitized_content)
+
                     # Original file name, stripped of .md and .html
                     title = re.sub(r'(^_|\.(md|html)$)', '', child['title'], flags=re.IGNORECASE)
                     # Lower-case slug, stripped of .md and .html
                     relative_url = slug = re.sub(r'(^_|\.(md|html)$)', '', local_title, flags=re.IGNORECASE)
-
-                    source_mime_type = child['mimeType']
-                    if source_mime_type in ['text/plain', 'text/html']:
+                    if append_html:
                         relative_url += '.html'
 
                     # Pull description from Google Drive
@@ -146,12 +166,13 @@ def recursiveDownloadInto(gauth, fID_from, path_to, maxdepth=float('infinity'), 
 
                     yaml_meta = yaml.safe_dump(file_metadata, default_flow_style=False,  explicit_start=True)
                     meta_file = os.path.join(path_to, '_meta_' + local_title + '.yml')
-                    with open(meta_file, 'w+') as f:
+                    with codecs.open(meta_file, 'w+', 'utf-8') as f:
                         f.write(yaml_meta)
 
                     print '  ' * (__currentDepth+1) + 'Copied %d bytes to file "%s"' % (bytes_to_copy, local_title)
                 except Exception as e:
                     print 'Failed: %s\n' % e
+                    raise
 
 
         # Get page
