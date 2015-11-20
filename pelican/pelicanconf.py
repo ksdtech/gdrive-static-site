@@ -10,7 +10,7 @@ PATH = 'content'
 
 # We have some static files here, too
 STATIC_PATHS = ['pages']
-STATIC_EXCLUDE_SOURCES = True
+# STATIC_EXCLUDE_SOURCES = True
 
 IGNORE_FILES = ['.#*', '.yml', '_*.*']
 
@@ -60,7 +60,7 @@ from markdown.inlinepatterns import Pattern
 from markdown.util import etree
 
 from pelican.contents import Content, Page
-from pelican.readers import BaseReader, MarkdownReader
+from pelican.readers import BaseReader, MarkdownReader, HTMLReader
 from pelican.utils import pelican_open
 
 class Section(Page):
@@ -186,41 +186,14 @@ class MarkdownExtReader(MarkdownReader):
     def __init__(self, *args, **kwargs):
         super(MarkdownExtReader, self).__init__(*args, **kwargs)
 
-    def _parse_metadata_external(self):
-        """Add external yaml metadata"""
-        head, source_file =  os.path.split(self._source_path)
-        meta_file = '_meta_' + source_file + '.yml'
-        yaml_source_path = os.path.join(head, meta_file)
-
-        metadata = dict()
-        if os.path.exists(yaml_source_path):
-            with pelican_open(yaml_source_path) as text:
-                metadata = yaml.load(text)
-                for name, value in metadata.items():
-                    metadata[name] = self.process_metadata(name, value)
-                print "%s -> loaded %r" % (meta_file, metadata)
-        if len(metadata) == 0:
-            print "%s -> NO METADATA" % meta_file
-        return metadata
-
-    def _parse_metadata(self, meta):
-        """Return the dict containing document metadata"""
-        formatted_fields = self.settings['FORMATTED_FIELDS']
-
-        # Parse external yaml metadata first
-        output = self._parse_metadata_external()
-        meta_local = super(MarkdownExtReader, self)._parse_metadata(meta)
-        output.update(meta_local)
-        return output
-
     def _build_section_links(self, metadata):
         section_links = [ ]
-        folder_dir = os.path.dirname(self._source_path)
-        meta_files = fnmatch.filter(os.listdir(folder_dir), '_meta_*.yml')
+        dirname, section_file_name = os.path.split(self._source_path)
+        meta_files = fnmatch.filter(os.listdir(dirname), '_meta_*.yml')
         for meta_file_name in meta_files:
             content_file_name = re.sub(r'(^_meta_|\.yml$)', '', meta_file_name)
-            if content_file_name != metadata['exported_file_name']:
-                yaml_source_path = os.path.join(folder_dir, meta_file_name)
+            if content_file_name != section_file_name:
+                yaml_source_path = os.path.join(dirname, meta_file_name)
                 with pelican_open(yaml_source_path) as text:
                     info = yaml.load(text)
                     section_links.append((info['title'], info['relative_url']))
@@ -244,5 +217,6 @@ class MarkdownExtReader(MarkdownReader):
 
         return content, metadata
 
-READERS = { 'md': MarkdownExtReader, 'yml': NavMenuReader }
+READERS = { 'md': MarkdownExtReader, 'yml': NavMenuReader, 
+    'html': HTMLReader }
 

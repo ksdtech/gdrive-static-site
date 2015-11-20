@@ -23,8 +23,8 @@ pip install -r requirements.txt
 
 7. Download files:
 ```
-python copy_folder.py ~/Projects/_active/gdrive-static-site/hexo/source 0B93xtFAz_q1FYS04RFJfQkJkdGM
-python copy_folder.py ~/Projects/_active/gdrive-static-site/pelican/content/pages 0B93xtFAz_q1FYS04RFJfQkJkdGM
+python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/hexo/source 
+python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/pelican/content/pages 
 ```
 
 8. Configure hexo. Edit site/_config.yml and site/themes/landscape/_config.yml.  Change url, root, and theme
