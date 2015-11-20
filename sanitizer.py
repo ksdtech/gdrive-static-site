@@ -97,7 +97,7 @@ MY_ALLOWED_STYLES = [
     'width', 'height'
 ]
 
-def head(metadata, styles):
+def head(metadata):
     title = metadata.pop('title', 'TITLE')
     metadata.pop('dirname', None)
     head_lines = [ '<head>', 
@@ -110,17 +110,23 @@ def head(metadata, styles):
     return '\n'.join(head_lines)
 
 def sanitize(content, metadata):
-    styles = ''
+    # parse content looking for the span class that signifies "bold"
+    styles = [ ]
     bold_class = set_bold_class(content)
     if bold_class:
-        styles = '<style>.' + bold_class + '{font-weight:bold}</style>'
+        styles = [ '<style>.' + bold_class + '{font-weight:bold}</style>' ]
+
+    # parse body of html
     i = content.index('<body')
     body = clean(content[i:], 
         tags=MY_ALLOWED_TAGS, attributes=MY_ALLOWED_ATTRIBUTES,
         styles=MY_ALLOWED_STYLES, strip=True, strip_comments=True)
+
+    # build a complete html5 document with title, meta elements and bold style
     html = '<!doctype html>\n<html>\n'
-    html += head(metadata, styles)
+    html += head(metadata)
     html += '<body>\n'
+    html += '\n'.join(styles)
     html += swap_entities(body)
     html += '</body>\n</html>\n'
     return html
