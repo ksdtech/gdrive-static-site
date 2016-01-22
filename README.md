@@ -12,58 +12,140 @@ https://github.com/Socialsquare/google-drive-migrator
 
 3. Create Web consent screen for the project.
 
-4. Create client secrets for the project.  Use redirect_uris: "http://localhost:8080/" and javascript_origins: "http://localhost:8080".  Download the client secrets JSON file to client_secrets.json file in top-level directory of this project.
+4. Create client secrets for the project.  Use redirect\_uris: "http://localhost:8080/" and javascript_origins: "http://localhost:8080".  Download the client secrets JSON file to client\_secrets.json file in top-level directory of this project.
 
 5. Obtain the id of top level Google Drive folder to copy.
 
 6. Install dependencies (PyDrive and html5lib):
-```
-pip install -r requirements.txt
-```
+
+        pip install -r requirements.txt
 
 7. Download files:
-```
-python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/hexo/source 
-python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/pelican/content/pages 
-```
 
-8. Configure hexo. Edit site/_config.yml and site/themes/landscape/_config.yml.  Change url, root, and theme
+        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/hexo/source 
+        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/pelican/content/pages 
+
+8. Configure hexo. Edit site/\_config.yml and site/themes/landscape/\_config.yml.  Change url, root, and theme
 menu links.
 
 9. Generate site:
-```
-cd pelican
-pelican -t ./themes/notmyidea ./content
-```
+
+        cd pelican
+        pelican -t ./themes/notmyidea ./content
 
 10. Serve site/public folder:
-```
-emacs /usr/local/etc/apache2/2.4/httpd.conf
-sudo /usr/local/Cellar/httpd24/2.4.12/bin/apachectl start
-```
-Some Ideas on Metadata and Site Organization
-============================================
 
-Website is organized from these types in Google Drive, organized in a folder tree:
-
-- text/plain documents with titles ending in ".md" are downloaded and used as markdown source
-- text/html documents with titles ending in ".html" are downloaded and used as html source
-- application/vnd.google-apps.document documents are exported as text/html and used as html source
-- application/pdf documents with titles ending in ".pdf" are donwloaded and used as static files
-- text/plain documents with titles ending in ".yml" are downloaded and used for metdata
-
-Any text/plain or application/vnd.google-apps.document Google Drive documents that have titles 
-that begin with an underscore are treated as resource files. They are downloaded and may be used 
-for inclusion (for example in iframes) but are not rendered as standalone pages.
-
-Currently there are two types of manually maintained yaml files to be used in site construction.
+        emacs /usr/local/etc/apache2/2.4/httpd.conf
+        sudo /usr/local/Cellar/httpd24/2.4.12/bin/apachectl start
 
 
-_navmenu_.yml
---------------
+Download Processor and Metadata Description
+===========================================
+Here is the way the download processor handles different Google Drive
+folder and document types.
 
-Located in top level of each site. Used to build primary navigation.
-navmenu is the top-level element. navmenu contains a list of submenus. 
+
+Titles
+------
+Every Google Drive item (folder or document) has a title or name.
+These can contain any unicode character but should avoid the characters
+"/" or ":".  The titles of native
+Google Docs should not end in a file extension like ".html".
+The titles of "text" documents such as YAML, HTML, or Markdown
+documents should have a file extension at the end of the title 
+(.yml", ".html", or ".md" respectively). Other non-native documents
+with recognizable file types (images, PDFs and the like)
+should also have a file extension (so that if they are downloaded
+the file extension will be set for the downloaded file on the user's system.)
+
+Items with titles that begin with special prefixes are handled specially.
+
+An underscore "\_" prefix indicates that the document will be downloaded
+for use by the Pelican processor, but will not stand on its own as a 
+list web page or folder.
+
+Two decimal digit "0-9" characters followed by a right bracket "]" character 
+and 1 or more optional space " " characters will be stripped off when
+creating the item's slug (web page URL) and title.  The two-digit prefix
+can be used to order items in a "section" template or navigation menu
+(see below).  Note that if a Google Drive document is located in more
+than one Drive folder (Drive folders are really just tags), the name
+will be the same in both locations.  For this reason, thhere is another 
+way to override the ordering of documents in a folder--see the "Sections"
+explanation below.
+
+
+Descriptions and Additional Metadata
+------------------------------------
+If you select a folder or document (of any type) in Google Drive, you 
+can add descriptive information by editing the "Description" attribute
+on the "Details" pane on the right hand side of the Google Drive page.
+This plain text description can be used as a teaser for the folder or document.
+
+Also the description can add metadata to the folder or document by using
+YAML markup at the end of the description field.  The YAML markup should
+be prefixed by a '---' (YAML document) line.
+
+
+Sections and Folder Metadata
+----------------------------
+To use the "section" template (similar to Schoolwires or Edline's "group page"),
+add this to (at the end of) the "Description" attribute of a Google folder. 
+You have to use Shift-Enter to put carriage returns in the "Description" field:
+
+    ---
+    template: section
+
+This will cause the "section" template to be used by Pelican, which will build
+a sub-navivagation menu with links to the contents of the folder. The links
+will be listed in lexicographic (alphabetical) order as described above.  
+
+In case you need to override the lexicographic order of a section, or hide
+any items that don't have a leading "\_" title, you can add a ".yml" document
+to the folder with the special title "\_folder.yml".
+
+    ---
+    template: section
+    contents:
+      - 
+        doc: Technology Overview.md
+        title: "Technology In The District"
+        summary: "These attributes will override the title and description
+        in Google Drive"
+      - 
+        doc: Social Media
+      - 
+        doc: "Our 1 to 1 Program"
+        title: "Our 1:1 Program"
+        template: null
+
+In the example above, the top-level "template: section" indicates that all
+documents listed inside the folder will use the "section" template (because
+we treat the folder as a section).  Then any documents that will be part of
+the section template are listed in order. The "doc" attribute must match
+the Google Drive title of the document EXACTLY. For this example, the
+downloaded titles (and slugs) for the section will be:
+
+1. Technology In The District (technology-in-the-district)
+2. Social Media (social-media)
+3. Our 1:1 Program (our-1-1-program)
+
+Note that the title and description for a doc can be overridden as shown,
+and some documents within the section can be displayed without the section
+template ("template: null" for the "Our 1:1 Program" document.
+
+If the "\_folder.yml" file is present, any other documents inside the
+Google Drive folder will be downloaded but will not be shown in the "section"
+navigation menu.
+
+
+Top-Level Navigation
+--------------------
+TBD
+
+If a YAML file named "\_navmenu.yml" is located in the top level folder of a site,
+it is used to build the primary navigation menus for the site.
+The "navmenu" is the top-level element in the YAML file.  The "navmenu" is a list of submenus. 
 Each submenu or item has a title and a type:
 
 - parent - this is a parent menu, and has a submenu list
@@ -71,15 +153,261 @@ Each submenu or item has a title and a type:
 - link-external - this is a link to a URL on an external site
 - pdf - this is a link to a downloadable PDF
 - doc - this is a link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
-- section - this is a link to a folder containing a _section_.yml file
+- section - this is a link to a folder with a "template: section" description or
+containing a \_folder\_.yml file
 
 
-_section_.yml
+Folders
+-------
+The MIME type for a Google Drive folder is "application/vnd.google-apps.folder".
+Folders are downloaded as follows:
+
+1. The name ("title") of the folder and any "description" on the folder
+are extracted, a slug is built based on the title, and the description is
+saved in a "summary" metadata field. Assume that the title
+was "General Information", then the slug would be "general-information".
+
+2. A metadata file named "\_folder\_general-information.yml" 
+is created with the sample content shown below. Note that the relative URL in the 
+metadata does not end in ".html": 
+
+        ---
+        author: Kentfield Schools Webmaster
+        date: '2015-11-02T22:15:58.595Z'
+        dirname: district
+        email: webmaster@kentfieldschools.org
+        relative_url: general-information
+        slug: general-information
+        source_id: 0B93xtFAz_q1FNXNNVXZpLVV5cFk
+        source_type: application/vnd.google-apps.folder
+        summary: null
+        title: General Information
+        updated: '2015-11-02T23:13:57.367Z'
+        version: '11861'
+
+3. After creating the metadata file, the contents of the folder are 
+processed (recursively).
+
+
+(Native) Google Docs
+--------------------
+The MIME type for a Google Doc is "application/vnd.google-apps.document".
+
+Google Docs are transformed to .html files in the content folder:
+
+1. The name ("title") of the Google Doc and any "description" on the Doc
+are extracted, a slug is built based on the title, and the description is
+saved in a "summary" metadata field. Assume that the title
+was "Technology Overview", then the slug would be "technology-overview".
+
+2. The file is downloaded to "\_raw\_technology-overview.html". ("\_raw\_" + slug + ".html")
+
+3. Then that file is post processed to pull out the "b" (bold) style and a few
+other sanitizing things.  The resultant file is named "technology-overview.html" (slug + ".html")
+
+4. A metadata file named "\_meta\_technology-overview.html.yaml" ("\_meta\_" + slug + "html.yml") 
+is created with the sample content shown below. Note that the relative URL in the 
+metadata does not end in ".html": 
+
+        ---
+        author: Kentfield Schools Webmaster
+        basename_raw: _raw_technology-overview.html
+        basename: technology-overview.html
+        date: '2015-11-17T22:42:51.519Z'
+        dirname: district/administration/technology
+        email: webmaster@kentfieldschools.org
+        exported_type: text/html
+        relative_url: technology-overview
+        slug: technology-overview
+        source_id: 1BbJOxqrdMj74nnpj8yyaL9cxeSvswpoG1Ir048SVeks
+        source_type: application/vnd.google-apps.document
+        summary: null
+        title: Technology Overview
+        updated: '2015-11-19T20:00:36.341Z'
+        version: '11856'
+
+
+Markdown Files
 --------------
+The MIME type for these documents is "text/plain" (after downloading the "exported_type" is
+set to "text/x-mardown"). The document name (or "title") must have the ".md" file extension 
+to distinguish it from a native Google Doc or plain text file.  Install the "Drive Notepad"
+Chrome extension to edit Markdown files natively in Google Drive.
 
-Located in a folder specified as a section in _navmenu_.yml.  Currently only
-has one element:
+Markdown documents are used where special formatting is required (such as including raw HTML).
+Markdown are downloaded to ".md" files in the content folder:
 
-- index_page - this is the title of the "overview" markdown page.  Normally it is omitted from the "contents"
-section of the page, which is a secondary navigation menu built from the alphabetical titles
-of any other pages in the folder.
+1. The name ("title") of the snippet and any "description" on it
+are extracted, the title is stripped of any leading underscore or file extension,
+a slug is built based on the stripped title, and the description is
+saved in a "summary" metadata field. Assume that the doc name
+was "District Overview.md", then the title would be "District Overview" and the 
+slug would be "district-overview".
+
+2. The file is downloaded to "\_raw\_district-overview.md". ("\_raw\_" + slug + ".md")
+
+3. In the post-download step, Pelican-compatible metadata is prepended to the Markdown
+source.  See http://docs.getpelican.com/en/3.6.3/content.html  The resulting file
+is named "district-overview.md".
+
+4. Also, a metadata file named "\_meta\_district-overview.md.yaml" ("\_meta\_" + slug + "md.yml") 
+is created with the sample content shown below. Note that the relative URL in the 
+metadata does not end in ".html": 
+
+        ---
+        author: Kentfield Schools Webmaster
+        basename_raw: _raw_district-overview.md
+        basename: district-overview.md
+        date: '2015-11-03T17:09:34.789Z'
+        dirname: district/general-information
+        email: webmaster@kentfieldschools.org
+        exported_type: text/x-markdown
+        relative_url: district-overview
+        slug: district-overview
+        source_id: 0B93xtFAz_q1FZG1IUGVleHVvbXc
+        source_type: text/plain
+        summary: null
+        title: District Overview
+        updated: '2015-11-05T00:10:05.776Z'
+        version: '11484'
+
+
+HTML Pages and Snippets
+-----------------------
+The MIME type for these documents in Google Drive is 'text/html'. These files should contain
+either a full HTML page (including a "head" section, which will be modified by the Pelican
+processor), or a snippet such as an "iframe" element.  For snippet files, 
+the doc name (or "title") should begin with an underscore (so it is not copied to the
+website directly). The doc title for full HTML pages or snippets must have the ".html" file 
+extension to distinguish it from a native Google Doc or plain text file.
+
+Raw HTML snippets are downloaded to ".html" files in the content folder:
+
+1. The name ("title") of the snippet and any "description" on it
+are extracted, the title is stripped of any leading underscore or file extension,
+a slug is built based on the stripped title, and the description is
+saved in a "summary" metadata field. Assume that the doc name
+was "\_District Map.html", then the title would be "District Map" and the slug would be "district-map".
+
+2. The file is downloaded to "\_district-map.html". ("\_" + slug + ".html" for snippets, slug + ".html" 
+for full HTML pages). The "relative\_url" will be (slug + ".html" for snippets and just the slug -- 
+without ".html" -- for complete pages).
+
+3. No post-download sanitizing is performed, although the Pelican processor will merge 
+information in the HTML "head" element with other metadata, CSS and script files.
+
+4. A metadata file named "\_meta\_\_district-map.html.yaml" ("\_meta\_" + slug + "html.yml") 
+is created with the sample content shown below. Note that the relative URL in the 
+metadata DOES end in ".html": 
+
+        ---
+        author: Kentfield Schools Webmaster
+        basename: _district-map.html
+        date: '2015-11-02T23:57:33.379Z'
+        dirname: district/general-information
+        email: webmaster@kentfieldschools.org
+        exported_type: null
+        relative_url: district-map.html
+        slug: district-map
+        source_id: 0B93xtFAz_q1Fd3VsTHlCYUE2dDg
+        source_type: text/html
+        summary: null
+        title: District Map
+        updated: '2015-11-04T23:21:37.469Z'
+        version: '11473'
+
+
+Media Documents
+---------------
+".jpg", ".png", ".m4v", ".mp3" and other media documents stored in Google Drive
+are also downloaded. Example MIME types are "image/png" or "application/pdf".
+
+Example: For a PDF document named "2015-16 District Calendar.pdf" in Google Drive
+the metadata file will contain:
+
+        ---
+        author: Kentfield Schools Webmaster
+        basename: 2015-16-district-calendar.pdf
+        date: '2015-11-02T23:57:33.379Z'
+        dirname: district/general-information
+        email: webmaster@kentfieldschools.org
+        exported_type: null
+        relative_url: 2015-16-district-calendar.pdf
+        slug: 2015-16-district-calendar
+        source_id: 0B93xtFAz_q1Fd3VsTHlCYUE2dDg
+        source_type: application/pdf
+        summary: null
+        title: 2015-16 District Calendar
+        updated: '2015-11-04T23:21:37.469Z'
+        version: '11473'
+
+More description TBD.
+
+
+Full List of Metadata Attributes
+--------------------------------
+Attributes generated by downloader (can be overridden in either the Google Drive Description 
+field or in a \_folder.yml file):
+
+- author: The human-readable author name (from Google profile)
+
+- basename_raw: The name of the file that was originally created during download 
+(or null if no post-processing was done).
+
+- basename: The name of the downloaded and post-processed file.
+
+- date: The modification date from Google Drive API.
+
+- dirname: The directory path within which the basename and basename\_raw files were created.
+
+- email: The email address of the author.
+
+- exported\_type: The MIME type of the downloaded (and possibly post-processed) file: "text/html", 
+"text/x-markdown", "text/x-yaml", image/...", etc.
+
+- relative\_url: The URL that will be produced (relative to the dirname) for the document. Markdown
+and Google Doc 
+
+- slug: The URL-friendly (lower-case) title that will be used to create a URL.  The slug should
+be unique within a folder and never has a file extension.
+
+- source\_id: The Google Drive id for the document or folder.
+
+- source\_type: The MIME type of the source document as reported by Google Drive.
+
+- summary: The "Description" attribute from Google Drive (stripped of leading and trailing whitespace
+and any YAML content that begins with '---'). Can be overridden in a \_folder.yml file.
+
+- template: Any Pelican template name.  If null (or omitted), the default "page" template will be used.
+
+- title: The title of the original Google Drive item, stripped of any special prefixes ("\_" or
+the "nn]" prefixes described above).  
+
+- updated: Timestamp of last modification.
+
+- version: Google Drive version number.
+
+
+Addtional Attributes found only in \_folder.yml:
+
+- contents: The list of documents to be displayed in the section.
+
+- doc: The source title (or id) for the document to be found in the folder.
+
+
+Attributes found only in \_navmenu.yml:
+
+- doc: A link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
+
+- link_external: A link to a URL on an external site
+
+- link_local: A link to a URL on the same site
+
+- parent: A parent menu that has a submenu list
+
+- pdf: A link to a downloadable PDF
+
+- section: A link to a folder with a "template: section" description or
+containing a \_folder\_.yml file
+
+- submenu: A list of links within this menu item.
