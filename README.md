@@ -1,6 +1,19 @@
-Jekyll-GDocs CMS Example
-========================
+gdrive-static-site
+==================
+Generate a static website from Google Drive folders and docs.
 
+There are two processes involved:
+
+1. The copy\_folder.py script recursively downloads folders and docs
+to a local directory tree from Google Drive using the Google Drive API, parsing and building metadata
+and sanitizing the exported HTML from Google Docs.
+
+2. The Pelican Python static website generator processes the local tree to output the finished
+website.  Special templates are invoked to create "sections" and primary and secondary navigation.
+
+
+copy\_folder.py
+---------------
 Recursively copies files and folder from Google Drive. Also creates .yml metadata files with source information.
 
 This project is adapted from the PyDrive-based downloader at:
@@ -20,20 +33,45 @@ https://github.com/Socialsquare/google-drive-migrator
 
         pip install -r requirements.txt
 
-7. Download files:
+7. Download and post-process files. copy\_folder takes two arguments: The Google Drive item id 
+of the top-level folder to start downloading with, and a path to download that folder to.  
+The final path component of the path should be "pages". Pelican will process these as static pages
+underneath the parent folder.  The recommended path should be "./pelican/content/pages" but
+you can put the "content/pages" part anywhere that you wish.  Example:
 
-        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/hexo/source 
-        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM ~/Projects/_active/gdrive-static-site/pelican/content/pages 
+        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM pelican/content/pages 
 
-8. Configure hexo. Edit site/\_config.yml and site/themes/landscape/\_config.yml.  Change url, root, and theme
-menu links.
 
-9. Generate site:
+Pelican Configuration
+_____________________
+
+1. Configure Pelican. Edit pelican/pelicanconf.py, setting the PATH variable 
+relative to the  "pelican" directory (or to an absolute path). See Pelican docs 
+for more information. Example:
+
+        AUTHOR = u'webmaster@kentfieldschools.org'
+        SITENAME = u'Kentfield School District'
+        SITEURL = 'http://127.0.0.1:8088/ksd'
+
+        PATH = 'content'
+
+        # We have some static files here, too
+        STATIC_PATHS = ['pages']
+        # STATIC_EXCLUDE_SOURCES = True
+
+        IGNORE_FILES = ['.#*', '.yml', '_*.*']
+
+2. Edit pelican/publishconf.py if necessary. See Pelican docs for more information.
+
+3. Edit the theme you will use (we are testing with the "notmyidea" theme). 
+See Pelican docs for more information.
+
+4. Generate the site:
 
         cd pelican
         pelican -t ./themes/notmyidea ./content
 
-10. Serve site/public folder:
+5. Serve the pelican/output folder (see Pelican docs for how to change this):
 
         emacs /usr/local/etc/apache2/2.4/httpd.conf
         sudo /usr/local/Cellar/httpd24/2.4.12/bin/apachectl start
