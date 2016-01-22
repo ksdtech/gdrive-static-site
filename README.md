@@ -43,8 +43,7 @@ you can put the "content/pages" part anywhere that you wish.  Example:
 
 
 Pelican Configuration
-_____________________
-
+---------------------
 1. Configure Pelican. Edit pelican/pelicanconf.py, setting the PATH variable 
 relative to the  "pelican" directory (or to an absolute path). See Pelican docs 
 for more information. Example:
