@@ -167,4 +167,3 @@ if __name__ == '__main__':
     meta_name = '_meta_' + basename + '.yml'
     metadata = yaml.load(codecs.open(os.path.join(dirname, meta_name), 'r', 'utf-8'))
     sanitize_html_file(file_from, file_to, metadata)
-
