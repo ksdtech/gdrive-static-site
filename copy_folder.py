@@ -11,6 +11,11 @@ from pydrive.drive import GoogleDrive
 
 from sanitizer import sanitize_html_file, prepend_markdown_metadata
 
+# List of atributes that users can put in Google Drive, Markdown, HTML, etc.
+USER_META_KEYS = [ 
+    'author', 'email', 'summary', 'template', 'title'
+]
+
 class GDriveDownloader():
     def __init__(self, maxdepth=1000000, verbose=False):
         self.depth = 0
@@ -44,6 +49,41 @@ class GDriveDownloader():
             print 'returning "%s" file_type "%s"' % (local_title, file_type)
         return (local_title, file_type)
 
+    # Pull description from Google Drive
+    # If there is '---' at the end of description, parse remaining bits as yaml.
+    def parseGDriveMeta(self, item):
+        description = None
+        raw_meta = None
+        if 'description' in item:
+            description = item['description'].strip()
+            yaml_i = description.find('---')
+            if yaml_i >= 0:
+                raw_meta = yaml.load(description[yaml_i:].strip())
+                description = description[:yaml_i].strip()
+                if self.verbose:
+                    print 'split description and meta at %d' % yaml_i
+                    print 'description: "%s"' % description
+                    print 'meta: %r' % raw_meta
+            if len(description) == 0:
+                description = None
+
+        gdrive_meta = { }
+        if raw_meta is None:
+            # No yaml part - create one     
+            if description is not None:
+                gdrive_meta['summary'] = description
+                if self.verbose:
+                    print 'returning description in meta: %r' % gdrive_meta
+        else:
+            # Update yaml part
+            if description is not None and 'summary' not in raw_meta:
+                raw_meta['summary'] = description
+            for key in [k for k in USER_META_KEYS if k in raw_meta and raw_meta[k] is not None]:
+                gdrive_meta[key] = raw_meta[key]
+            if self.verbose:
+                print 'returning meta: %r' % gdrive_meta
+        return gdrive_meta
+
     def getDownloadContent(self, download_url):
         content = None
         if download_url:
@@ -75,6 +115,8 @@ class GDriveDownloader():
             if self.verbose:
                 print '  ' * self.depth + 'Created folder "%s" in "%s"' % (local_title, cur_path)
 
+        # Pull description from Google Drive
+        gdrive_meta = self.parseGDriveMeta(folder_item)
         folder_meta = {
             'author': folder_item['lastModifyingUserName'],
             'basename': local_title,
@@ -93,6 +135,8 @@ class GDriveDownloader():
             'updated': folder_item['modifiedDate'],
             'version': folder_item['version']
         }
+        folder_meta.update(gdrive_meta)
+
         meta_file = os.path.join(new_folder, '_folder_.yml')
         self.writeMeta(meta_file, folder_meta)
         return new_path
@@ -131,15 +175,16 @@ class GDriveDownloader():
                     print 'Unknown object type (not file or folder): "%s"' % child['kind']
                     pp(child)
 
-                local_title, exported_type = self.getLocalTitle(child)
-                if child['mimeType'] == 'application/vnd.google-apps.folder':
+                source_type = child['mimeType']
+                if source_type == 'application/vnd.google-apps.folder':
                     self.depth += 1
                     new_folder = self.makeFolder(child, path_to)
                     self.recursiveDownloadInto(child['id'], new_folder)
 
                 else:
+                    local_title, exported_type = self.getLocalTitle(child)
+
                     append_html = False
-                    source_type = child['mimeType']
                     if exported_type == 'text/html':
                         append_html = True
 
@@ -176,14 +221,7 @@ class GDriveDownloader():
                             relative_url += '.html'
 
                         # Pull description from Google Drive
-                        # TODO: if there is '---' at the end of description
-                        #    parse remaining bits as yaml.
-                        description = None
-                        if 'description' in child:
-                            description = child['description'].strip()
-                            if len(description) == 0:
-                                description = None
-
+                        gdrive_meta = self.parseGDriveMeta(child)
                         file_meta = {
                             'author': child['lastModifyingUserName'],
                             'basename': file_name,
@@ -196,12 +234,13 @@ class GDriveDownloader():
                             'slug': slug,
                             'source_id': child['id'],
                             'source_type': source_type,
-                            'summary': description,
+                            'summary': None,
                             'template': None,
                             'title': title,
                             'updated': child['modifiedDate'],
                             'version': child['version']
                         }
+                        file_meta.update(gdrive_meta)
 
                         meta_file = os.path.join(self.root_path, path_to, meta_name)
                         self.writeMeta(meta_file, file_meta)
