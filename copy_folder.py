@@ -14,6 +14,7 @@ from sanitizer import sanitize_html_file, prepend_markdown_metadata
 class GDriveDownloader():
     def __init__(self, maxdepth=1000000, verbose=False):
         self.depth = 0
+        self.root_path = None
         self.gauth = None
         self.gdrive = None
         self.maxdepth = maxdepth
@@ -55,31 +56,46 @@ class GDriveDownloader():
         return content
 
     def makeFolder(self, folder_item, path_to):
-        local_title, file_type = self.getLocalTitle(folder_item)
-        new_folder = os.path.join(path_to, local_title)
+        local_title, exported_type = self.getLocalTitle(folder_item)
+        cur_path = None
+        new_path = None
+        new_folder = None
+        if path_to == '':
+            cur_path = '/'
+            new_path = local_title
+            new_folder = os.path.join(self.root_path, local_title)
+        else:
+            cur_path = os.path.join('/', path_to)
+            new_path = os.path.join(path_to, local_title)
+            new_folder = os.path.join(self.root_path, new_path)
         exists_check = os.path.exists(new_folder)
 
         if not exists_check:
             os.mkdir(new_folder)
             if self.verbose:
-                print '  ' * self.depth + 'Created folder "%s" in "%s"' % (local_title, path_to)
+                print '  ' * self.depth + 'Created folder "%s" in "%s"' % (local_title, cur_path)
 
-        folder_metadata = {
-            'source_id': folder_item['id'],
-            'title': folder_item['title'],
-            'source_type': folder_item['mimeType'],
-            'date': folder_item['createdDate'],
-            'updated': folder_item['modifiedDate'],
-            'version': folder_item['version'],
+        folder_meta = {
             'author': folder_item['lastModifyingUserName'],
-            'email': folder_item['lastModifyingUser']['emailAddress']
+            'basename': local_title,
+            'basename_raw': local_title,
+            'date': folder_item['createdDate'],
+            'dirname': cur_path,
+            'email': folder_item['lastModifyingUser']['emailAddress'],
+            'exported_type': exported_type,
+            'relative_url': local_title,
+            'slug': local_title,
+            'source_id': folder_item['id'],
+            'source_type': folder_item['mimeType'],
+            'summary': None, # TODO
+            'template': None, # TODO
+            'title': folder_item['title'],
+            'updated': folder_item['modifiedDate'],
+            'version': folder_item['version']
         }
         meta_file = os.path.join(new_folder, '_folder_.yml')
-        yaml_meta = yaml.safe_dump(folder_metadata, default_flow_style=False,  explicit_start=True)
-        with codecs.open(meta_file, 'w+', 'utf-8') as f:
-            f.write(yaml_meta)
-
-        return new_folder
+        self.writeMeta(meta_file, folder_meta)
+        return new_path
 
     def recursiveDownloadInto(self, fID_from, path_to):
         if self.depth > self.maxdepth:
@@ -97,7 +113,8 @@ class GDriveDownloader():
 
         if self.depth == 0:
             if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
-                path_to = self.makeFolder(item, path_to)
+                self.root_path = path_to
+                path_to = self.makeFolder(item, '')
             else:
                 print  '  ' * self.depth + 'Top level item is not a folder'
                 return
@@ -134,7 +151,7 @@ class GDriveDownloader():
                     if exported_type in ['text/html', 'text/x-markdown']:
                         file_name = '_raw_' + file_name
 
-                    new_file = os.path.join(path_to, file_name)
+                    new_file = os.path.join(self.root_path, path_to, file_name)
                     exists_check = os.path.exists(new_file)
                     if self.verbose:
                         print '  ' * (self.depth+1) + 'Trying to download "%s"' % child['title']
@@ -167,27 +184,27 @@ class GDriveDownloader():
                             if len(description) == 0:
                                 description = None
 
-                        file_metadata = {
-                            'source_id': child['id'],
-                            'title': title,
-                            'slug': slug,
-                            'relative_url': relative_url,
-                            'source_type': source_type,
-                            'exported_type': exported_type,
-                            'dirname': path_to,
-                            'basename': file_name,
-                            'summary': description,
-                            'date': child['createdDate'],
-                            'updated': child['modifiedDate'],
-                            'version': child['version'],
+                        file_meta = {
                             'author': child['lastModifyingUserName'],
-                            'email': child['lastModifyingUser']['emailAddress']
+                            'basename': file_name,
+                            'basename_raw': file_name,
+                            'date': child['createdDate'],
+                            'dirname': path_to,
+                            'email': child['lastModifyingUser']['emailAddress'],
+                            'exported_type': exported_type,
+                            'relative_url': relative_url,
+                            'slug': slug,
+                            'source_id': child['id'],
+                            'source_type': source_type,
+                            'summary': description,
+                            'template': None,
+                            'title': title,
+                            'updated': child['modifiedDate'],
+                            'version': child['version']
                         }
 
-                        yaml_meta = yaml.safe_dump(file_metadata, default_flow_style=False,  explicit_start=True)
-                        meta_file = os.path.join(path_to, meta_name)
-                        with codecs.open(meta_file, 'w+', 'utf-8') as f:
-                            f.write(yaml_meta)
+                        meta_file = os.path.join(self.root_path, path_to, meta_name)
+                        self.writeMeta(meta_file, file_meta)
 
                         if self.verbose:
                             print '  ' * (self.depth+1) + 'Copied %d bytes to file "%s"' % (bytes_to_copy, local_title)
@@ -202,19 +219,36 @@ class GDriveDownloader():
             if not page_token:
                 break
 
+    def readMeta(self, meta_file):
+        metadata = { }
+        with codecs.open(meta_file, 'r', 'utf-8') as f:
+            metadata = yaml.load(f)
+        return metadata
+
+    def writeMeta(self, meta_file, metadata):
+        yaml_meta = yaml.safe_dump(metadata, default_flow_style=False,  explicit_start=True)
+        with codecs.open(meta_file, 'w+', 'utf-8') as f:
+            f.write(yaml_meta)
+
     def postProcess(self):
         self.file_list.sort()
-        for dirname, basename, slug, meta_name, source_type, exported_type in self.file_list:
+        for dirname, basename_raw, slug, meta_name, source_type, exported_type in self.file_list:
+            file_in = os.path.join(self.root_path, dirname, basename_raw)
+            meta_file = os.path.join(self.root_path, dirname, meta_name)
             if exported_type == 'text/html':
-                file_in = os.path.join(dirname, basename)
-                file_out = os.path.join(dirname, slug + '.html')
-                metadata = yaml.load(codecs.open(os.path.join(dirname, meta_name), 'r', 'utf-8'))
+                basename = slug + '.html'
+                file_out = os.path.join(self.root_path, dirname, slug + '.html')
+                metadata = self.readMeta(meta_file)
+                metadata['basename'] = basename
                 sanitize_html_file(file_in, file_out, metadata)
+                self.writeMeta(meta_file, metadata)
             elif exported_type == 'text/x-markdown':
-                file_in = os.path.join(dirname, basename)
-                file_out = os.path.join(dirname, slug + '.md')
-                metadata = yaml.load(codecs.open(os.path.join(dirname, meta_name), 'r', 'utf-8'))
+                basename = slug + '.md'
+                file_out = os.path.join(self.root_path, dirname, slug + '.md')
+                metadata = self.readMeta(meta_file)
+                metadata['basename'] = basename
                 prepend_markdown_metadata(file_in, file_out, metadata)
+                self.writeMeta(meta_file, metadata)
 
 
 if __name__ == '__main__':
@@ -223,11 +257,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Recursively downloads the contents of a Google Drive folder to a path on the local machine')
     parser.add_argument('--verbose', action='store_true', help='print progress on stdout')
     parser.add_argument('src_folder_id', metavar='SRC_FOLDER_ID', help='top level Google Drive folder id')
-    parser.add_argument('dest_path', metavar='DEST_PATH', help='top level path')
+    parser.add_argument('dest_base', metavar='DEST_BASE', help='top level path')
 
     args = parser.parse_args()
     downloader = GDriveDownloader(verbose=args.verbose)
-    downloader.recursiveDownloadInto(args.src_folder_id, args.dest_path)
+    downloader.recursiveDownloadInto(args.src_folder_id, args.dest_base)
     downloader.postProcess()
 
 

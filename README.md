@@ -39,7 +39,7 @@ The final path component of the path should be "pages". Pelican will process the
 underneath the parent folder.  The recommended path should be "./pelican/content/pages" but
 you can put the "content/pages" part anywhere that you wish.  Example:
 
-        python copy_folder.py 0B93xtFAz_q1FYS04RFJfQkJkdGM pelican/content/pages 
+        python copy_folder.py 0B93xtFAz_q1FQmdILTVtcGRIZlk pelican/content/pages 
 
 
 Pelican Configuration
@@ -175,6 +175,10 @@ If the "\_folder.yml" file is present, any other documents inside the
 Google Drive folder will be downloaded but will not be shown in the "section"
 navigation menu.
 
+Metadata for folders are postprocessed when all the documents and subfolders
+have been created, to pick up ordering, hidden attributes and recursively 
+contained folders (called "subsections");
+
 
 Top-Level Navigation
 --------------------
@@ -192,6 +196,19 @@ Each submenu or item has a title and a type:
 - doc - this is a link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
 - section - this is a link to a folder with a "template: section" description or
 containing a \_folder\_.yml file
+
+
+Breadcrumbs
+-----------
+TBD
+
+
+Specifying and Fixing Local Links
+---------------------------------
+Intra-site links present in source documents have to be transformed into working 
+links in the downloaed and exported documents. 
+
+TBD
 
 
 Folders
@@ -388,10 +405,10 @@ field or in a \_folder.yml file):
 
 - author: The human-readable author name (from Google profile)
 
+- basename: The name of the downloaded and post-processed file.
+
 - basename_raw: The name of the file that was originally created during download 
 (or null if no post-processing was done).
-
-- basename: The name of the downloaded and post-processed file.
 
 - date: The modification date from Google Drive API.
 
@@ -425,11 +442,23 @@ the "nn]" prefixes described above).
 - version: Google Drive version number.
 
 
-Addtional Attributes found only in \_folder.yml:
+Additional attributes found only in \_folder.yml:
 
 - contents: The list of documents to be displayed in the section.
 
 - doc: The source title (or id) for the document to be found in the folder.
+
+- expanded: null or the number (0-9) of subsection levels that will be displayed int the subsection menu.
+
+- hidden: True or false.
+
+- numbering: null or the numbering pattern, (like "1.a.1") to display contents and subsections.
+
+- parent: null or the generated full_url of this folder's parent.
+
+- subsections: The list of child folders (as slugs or relative_urls) to be displayed in the section.
+
+- top: null or the generated full_url of the top-most "section" contaning this folder.
 
 
 Attributes found only in \_navmenu.yml:
@@ -448,3 +477,13 @@ Attributes found only in \_navmenu.yml:
 containing a \_folder\_.yml file
 
 - submenu: A list of links within this menu item.
+
+
+
+
+
+
+
+
+
+

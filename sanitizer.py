@@ -99,7 +99,6 @@ MY_ALLOWED_STYLES = [
 
 def head(metadata):
     title = metadata.pop('title', 'TITLE')
-    metadata.pop('dirname', None)
     head_lines = [ '<head>', 
         '<meta name="charset" content="utf-8">', 
         '<title>%s</title>' % cgi.escape(title) ]
@@ -139,7 +138,6 @@ def sanitize_html_file(file_in, file_out, metadata):
             f_out.write(sanitized_content)
 
 def prepend_markdown_metadata(file_in, file_out, metadata):
-    metadata.pop('dirname', None)
     with codecs.open(file_in, 'r', 'utf-8') as f_in:
         file_content = f_in.read()
         with codecs.open(file_out, 'w+', 'utf-8') as f_out:
