@@ -123,6 +123,16 @@ Also the description can add metadata to the folder or document by using
 YAML markup at the end of the description field.  The YAML markup should
 be prefixed by a '---' (YAML document) line.
 
+The only allowed keys for metadata in the "Details" YAML section are:
+
+- author
+- email
+- summary
+- template
+- title
+
+These attributes must be specified in lower case
+
 
 Sections and Folder Metadata
 ----------------------------
