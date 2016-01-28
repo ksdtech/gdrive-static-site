@@ -97,13 +97,17 @@ MY_ALLOWED_STYLES = [
     'width', 'height'
 ]
 
+MY_EXCLUDED_META_NAMES = [
+    'title'
+]
+
 def head(metadata):
-    title = metadata.pop('title', 'TITLE')
+    title = metadata.get('title', 'TITLE')
     head_lines = [ '<head>', 
         '<meta name="charset" content="utf-8">', 
         '<title>%s</title>' % cgi.escape(title) ]
     for name, content in metadata.iteritems():
-        if content:
+        if content and name not in MY_EXCLUDED_META_NAMES:
             head_lines.append('<meta name="%s" content="%s">' % (name, cgi.escape(content)))
     head_lines.append('</head>')
     return '\n'.join(head_lines)

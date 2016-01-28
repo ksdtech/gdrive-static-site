@@ -67,8 +67,10 @@ See Pelican docs for more information.
 
 4. Generate the site:
 
-        cd pelican
-        pelican -t ./themes/notmyidea ./content
+        pelican pelican/content -D -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
+
+'-D' flag is for debug output
+'-d' flag is to delete the output directory first
 
 5. Serve the pelican/output folder (see Pelican docs for how to change this):
 
@@ -210,15 +212,36 @@ containing a \_folder\_.yml file
 
 Breadcrumbs
 -----------
-TBD
+We won't do this for now.  There's a thought among UX experts that breadcrumbs are 
+not comprehensible for most users.
 
 
 Specifying and Fixing Local Links
 ---------------------------------
 Intra-site links present in source documents have to be transformed into working 
-links in the downloaed and exported documents. 
+links in the downloaed and exported documents. Pelican has two macros that can
+be embedded in Markdown for these "links to internal content":  "{filename}" and
+"{attach}".  See http://docs.getpelican.com/en/3.6.3/content.html#linking-to-internal-content
 
-TBD
+So, there are several ways to specify internal links in source documents, 
+depending on the type of document.
+
+1. Links to Google Docs. As part of the preprocessing phase in Pelican, we build a
+map (from exported metadata) from the original Google Doc file ID to the exported
+HTML url(s).
+
+a. If an exported page has a link to another Google Doc, and that target doc
+was exported into a static HTML page for the site, we change the link in the exported HTML 
+to point to the static page.  If the target doc appears in more than one location,
+we change the link to the preferred location by selecting the "closest" location
+to the source document.
+
+b. If the target doc whas not exported, then the link is left alone.
+
+2. Links to Markdown documents. We follow the Pelican convention, using "{filename}"
+or "{attach}" in the links.
+
+3. Links to HTML documents. TBD
 
 
 Folders
@@ -246,7 +269,7 @@ metadata does not end in ".html":
         source_type: application/vnd.google-apps.folder
         summary: null
         title: General Information
-        updated: '2015-11-02T23:13:57.367Z'
+        modified: '2015-11-02T23:13:57.367Z'
         version: '11861'
 
 3. After creating the metadata file, the contents of the folder are 
@@ -287,7 +310,7 @@ metadata does not end in ".html":
         source_type: application/vnd.google-apps.document
         summary: null
         title: Technology Overview
-        updated: '2015-11-19T20:00:36.341Z'
+        modified: '2015-11-19T20:00:36.341Z'
         version: '11856'
 
 
@@ -332,7 +355,7 @@ metadata does not end in ".html":
         source_type: text/plain
         summary: null
         title: District Overview
-        updated: '2015-11-05T00:10:05.776Z'
+        modified: '2015-11-05T00:10:05.776Z'
         version: '11484'
 
 
@@ -377,7 +400,7 @@ metadata DOES end in ".html":
         source_type: text/html
         summary: null
         title: District Map
-        updated: '2015-11-04T23:21:37.469Z'
+        modified: '2015-11-04T23:21:37.469Z'
         version: '11473'
 
 
@@ -402,7 +425,7 @@ the metadata file will contain:
         source_type: application/pdf
         summary: null
         title: 2015-16 District Calendar
-        updated: '2015-11-04T23:21:37.469Z'
+        modified: '2015-11-04T23:21:37.469Z'
         version: '11473'
 
 More description TBD.
@@ -447,7 +470,7 @@ and any YAML content that begins with '---'). Can be overridden in a \_folder.ym
 - title: The title of the original Google Drive item, stripped of any special prefixes ("\_" or
 the "nn]" prefixes described above).  
 
-- updated: Timestamp of last modification.
+- modified: Timestamp of last modification.
 
 - version: Google Drive version number.
 
@@ -489,11 +512,121 @@ containing a \_folder\_.yml file
 - submenu: A list of links within this menu item.
 
 
+Pelican Phase and Settings
+==========================
+After downloading, the Pelican static site generator is run.  For basic information see this
+document: http://docs.getpelican.com/en/3.6.3/internals.html
+
+Brief pseudocode of how Pelican works (from pelican/__init__.py):
+
+1. Read arguments and settings from command line and the pelicanconf.py settings file.
+
+2. Create an instance of the Pelican class.
+
+2. Build list of Readers from BaseReader (processes files with 'static' file extension), 
+    RstReader ('rst' file extension), MarkdownReader ('md', 'markdown', 'mkd', and 
+    'mdown' file extensions), HTMLReader ('htm' and 'html' extensions), 
+    and any addtional "enabled" readers imported from the settings file, 
+    and map each reader to the file extensions it handles.
+
+3. Watch content, theme and static file folders for changes (that might trigger rebuild).
+
+4. Call Pelican.run:
+
+a. Build list of Generators: ArticlesGenerator, PagesGenerator, TemplatePagesGenerator
+    (if 'TEMPLATE_PAGES' is specified), SourceFileGenerator (if 'OUTPUT_SOURCES' is 
+    specified), and any custom generators specified in the settings file..
+
+b. Clean the output directory.
+
+c. For each generator, if the generator specifies a 'generate_context' function, call it.
+    After all contexts have been generated, send the 'all_generators_finalized' signal.
+
+d. Create a writer object.
+
+e. For each generator, if the generator specifies a 'generate_output' function, call it,
+    sending the output to the Pelican writer object. After all output has been generated,
+    send the 'finalized' signal.
+
+f. Generate statistics on articles and pages processed.
 
 
+Here's how the PagesGenerator.generate_context function operates:
+
+1. Loop through all files in 'PAGE_PATHS', excluding those in 'PAGE_EXCLUDES'.  
+
+2. For each file, call the Readers object to find an enabled reader that matches the 
+    file extension. The Readers object performs the following:
+
+    a. If no reader is found, or the reader throws an exception, 
+    or the reader returns false, the file is not processed and is marked 'failed'. 
+    
+    b. After reading, the file's content and metadata are packaged in an object of a
+    subclass of the Content class--in this case a Page object. 
+    
+    c. The generator then calls the 'is_valid_content' function,
+    which is just a wrapper for the Page object's 'check_properties()' method.
+    If some required property is missing, 'is_valid_content' return False,
+    the file is not processed further and is marked 'failed'.  
+    
+    d. If the page's status after reading is not either 'published' or 'hidden',  
+    the file is not processed further and is marked 'failed'. 
+
+    e. Otherwise, the Page object crated is added to the 'all_pages' (if published) 
+    or 'hidden_pages' lists in the Generator.
+
+3. After all files have been read, the generator calls the Pelican utils' 
+    process_translations function to translate pages that have a translation 
+    metadata element in them.  Add these translated pages to create the final 
+    'translations', 'pages', 'hidden_translations' and 'hidden_pages' lists.
+
+4. Add 'pages' and 'hidden_pages' to the generator's context. Also set the context's
+    'PAGES' attribute to the 'pages' list.
+
+5. After all files have been processed, send the 'page_generator_finalized' signal, 
+    so other observerss can do something with the context if necessary.
 
 
+The Readers object does the following to read a file sent from the PageGenerator:
+
+1. Send the 'page_generator_preread' signal.
+
+2. Find the reader associated with the file extension.
+
+3. Set up initial metadata.
+
+4. Call the reader's read method to read the file from disk. Metadata is collected from
+    the file as specified for the different types of files processed (see the Pelican
+    documentation) and added to the initial metadata.
+
+5. Send the 'page_generator_context' signal.
+
+6. Create and return an instance of the Page class (with the default template 'page').
+    Page is subclassed from Content.  In the contructor for a Content object,
+    still more metadata is added to the Page object, such as 'override_save_as'
+    and 'override_url'.  When the instance has been created, send the 'content_object_init'
+    signal.
 
 
+Here's how the PagesGenerator.generate_output function operates:
 
+1. Loop through all the 'translations', 'pages', 'hidden_translations' and 'hidden_pages'
+    lists.
 
+2. For each page, call writer.write_file to create the output. The writer has been
+    initialized with an output path, and settings. 
+    The 'write_file' method is called with the PageGenerator's 'context', 
+    the page's 'template', 'save_as', and 'override_save_as'
+    attributes, and the global 'RELATIVE_URLS' setting (to determine whether to 
+    write relative or absolute URLs in links). The Jinja2 template is loaded
+    by the generator from the correspondingly named HTML file within the
+    active theme's 'templates' directory.
+
+3. The writer copies the generator's context into a 'local context' object. 
+    If 'RELATIVE_URLS' is set, URLs in the 'local contxext' are rewritten from 
+    absolute to relative ones. 
+
+4. The writer calls template.render on the 'local context'.
+
+5. After all the files have been written, send the 'page_writer_finalized' signal, 
+    so other observerss can do something with the context or writer if necessary.

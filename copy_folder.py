@@ -132,7 +132,7 @@ class GDriveDownloader():
             'summary': None, # TODO
             'template': None, # TODO
             'title': folder_item['title'],
-            'updated': folder_item['modifiedDate'],
+            'modified': folder_item['modifiedDate'],
             'version': folder_item['version']
         }
         folder_meta.update(gdrive_meta)
@@ -237,7 +237,7 @@ class GDriveDownloader():
                             'summary': None,
                             'template': None,
                             'title': title,
-                            'updated': child['modifiedDate'],
+                            'modified': child['modifiedDate'],
                             'version': child['version']
                         }
                         file_meta.update(gdrive_meta)
