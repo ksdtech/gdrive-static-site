@@ -194,7 +194,7 @@ class GDriveDownloader():
 
                     meta_name = '_meta_' + file_name + '.yml'
                     if exported_type in ['text/html', 'text/x-markdown']:
-                        file_name = '_raw_' + file_name
+                        file_name = '_raw_' + file_name + '.x'
 
                     new_file = os.path.join(self.root_path, path_to, file_name)
                     exists_check = os.path.exists(new_file)
@@ -216,9 +216,11 @@ class GDriveDownloader():
                         title = re.sub(r'(^_|\.(md|html)$)', '', child['title'], flags=re.IGNORECASE)
                         # Lower-case slug, stripped of .md and .html
 
-                        relative_url = slug = re.sub(r'(^_|\.(md|html)$)', '', local_title, flags=re.IGNORECASE)
+                        slug = relative_url = re.sub(r'(\.(md|html)$)', '', local_title, flags=re.IGNORECASE)
                         if re.search(r'\.(md|html)$', local_title):
                             relative_url += '.html'
+                        if slug[:1] == '_':
+                            slug = slug[1:]
 
                         # Pull description from Google Drive
                         gdrive_meta = self.parseGDriveMeta(child)

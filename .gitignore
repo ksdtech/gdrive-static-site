@@ -1,5 +1,6 @@
 .DS_Store
 *.pyc
+*.log
 node_modules/*
 hexo/*
 pelican/*

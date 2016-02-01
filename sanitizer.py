@@ -164,7 +164,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dirname, basename = os.path.split(args.file_name)
-    file_from = os.path.join(dirname, '_raw_' + basename)
+    file_from = os.path.join(dirname, '_raw_' + basename + '.x')
     file_to = os.path.join(dirname, basename)
     meta_name = '_meta_' + basename + '.yml'
     metadata = yaml.load(codecs.open(os.path.join(dirname, meta_name), 'r', 'utf-8'))
