@@ -12,8 +12,8 @@ PATH = 'content'
 STATIC_PATHS = ['pages']
 STATIC_EXCLUDE_SOURCES = True
 
-# GLobal INGORE_FILES setting - overriden by YamlGenerator
-IGNORE_FILES = ['_*.*', '*.x', '*.yml', '.#*']
+# GLobal INGORE_FILES setting - overriden in YamlGenerator
+IGNORE_FILES = ['_*.*', '*.yml', '.#*']
 
 # Per-generator exclude path patterns
 # ARTICLE_EXCLUDES = []
@@ -60,7 +60,12 @@ LOAD_CONTENT_CACHE = False
 
 import os.path
 import sys
+
+# Find patched bleach module
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
+# Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 
 from pelican import signals
 from pelican.readers import HTMLReader

@@ -4,8 +4,10 @@ import sys
 
 from pelican.contents import is_valid_content
 from pelican.generators import CachingGenerator, PagesGenerator
+
 from gdrivepel.contents import Page, DocMeta, NavMenu
 from gdrivepel.readers import YamlReader
+from gdrivepel.sanitizer import make_meta_filename
 
 # logger for this file
 logger = logging.getLogger(__name__)
@@ -134,13 +136,19 @@ logger = logging.getLogger(__name__)
 }
 """
 
+YAML_GENERATOR_IGNORE_FILES = ['_raw_*.*', '.#*']
+YAML_KEYS = [ 'author', 'basename_raw', 'date',
+    'email', 'exported_type', 'modified', 'relative_url',
+    'slug', 'source_id', 'source_type', 'summary', 'template',
+    'title', 'version' ]
+
 class YamlGenerator(CachingGenerator):
     """
     Process .yml files to merge metadata
     We will keep mappings of Google Doc ids to downloaded files, 
     navigation menus, section topics and subtopics here.
 
-    We don't generate any output!
+    We don't generate any output so we do not define a generate_output method.
     """
 
     def __init__(self, *args, **kwargs):
@@ -148,6 +156,7 @@ class YamlGenerator(CachingGenerator):
         # Mapping from Google Doc id to URLs in the content/pages 
         # directory tree
         self.docid_map = { }
+        self.by_classes = { }
 
     def _patch_readers(self):
         """Remove existing readers and rebuild just with YamlReader."""
@@ -175,7 +184,7 @@ class YamlGenerator(CachingGenerator):
         Store a reference to its Content object, for url lookups later.
         """
         super(YamlGenerator, self).add_source_path(content)
-        logger.debug('YamlGenerator - add_source_path %s -> %s %s' % (content.source_id, content.dirname, content.basename))
+
         if not content.source_id in self.docid_map:
             self.docid_map[content.source_id] = [ ]
         self.docid_map[content.source_id].append(content)
@@ -184,12 +193,15 @@ class YamlGenerator(CachingGenerator):
         # Only use YamlReader, don't ingore anything, but only read files with yml extension.
         self._patch_readers()
 
-        # God help us if they make this multi-threaded
+        # Custom settings for self.get_files
         saved_ignore_files = self.settings['IGNORE_FILES']
-        self.settings['IGNORE_FILES'] = [ ]
-        for f in self.get_files(
+        self.settings['IGNORE_FILES'] = YAML_GENERATOR_IGNORE_FILES
+        filelist = self.get_files(
                 self.settings['PAGE_PATHS'], 
-                exclude=[], extensions=('yml')):
+                exclude=[], extensions=('yml'))
+        self.settings['IGNORE_FILES'] = saved_ignore_files
+
+        for f in filelist:
             logger.debug('YamlGenerator - read %s' % f)
 
             # Define content class for _navmenu_.yml files.
@@ -217,95 +229,101 @@ class YamlGenerator(CachingGenerator):
                 self.cache_data(f, doc_meta)
                 self.add_source_path(doc_meta)
 
-        self.settings['IGNORE_FILES'] = saved_ignore_files
 
-    # TODO: This code will go into the YamlGenerator which has the global
-    # context of all files and folders downloaded from Google Drive.
-    def _build_section_links(self, folder, doc_meta):
-        doc_links = [ ]
-        subfolder_links = [ ]
-        for location, obj in self.context['filenames'].iteritems():
-            dirname, fname = os.path.split(location)
-            parent = os.path.dirname(dirname)
-            if dirname == folder and obj is not None and isinstance(obj, Page):
-                doc_links.append((obj.metadata['title'], location))
-            elif fname == '_folder_.yml' and parent == folder:
-                subfolder_links.append((obj.metadata['title'], dirname))
+    def _doc_meta_for_page(self, location):
+        dirname, fname = os.path.split(location)
+        meta_filename = make_meta_filename(fname)
+        yaml_filename = os.path.join(dirname, meta_filename)
+        if yaml_filename in self.context['filenames']:
+            doc_meta = self.context['filenames'][yaml_filename]
+            return doc_meta
+        return None
 
-        doc_meta.metadata['contents'] = [ ]
-        doc_meta.metadata['subtopics'] = [ ]
-        count = 0
-        for link in sorted(doc_links, key=lambda x: x[0]):
-            doc_meta.metadata['contents'].append({ 'title': link[0], 'location': link[1] })
-            count += 1
-        for link in sorted(subfolder_links, key=lambda x: x[0]):
-            doc_meta.metadata['subtopics'].append({ 'title': link[0], 'location': link[1] })
-            count += 1
-
-    def _add_yaml_meta_to_page(self, dirname, fname, page):
-        yaml_doc = os.path.join(dirname, '_meta_' + fname + '.yml')
-        if yaml_doc in self.context['filenames']:
-            doc_meta = self.context['filenames'][yaml_doc]
-            if doc_meta is not None:
-                page.metadata.update(doc_meta.metadata)
-                logger.debug('Updated meta for page %s/%s' % (dirname, fname))
-            else:
-                logger.debug('No DocMeta for for page %s/%s' % (dirname, fname))
-                page.metadata['title'] = fname
-                sys.exit(1)
-        else:
-            logger.debug('No meta file for page %s/%s' % (dirname, fname))
-            page.metadata['title'] = fname
-
-    def _add_yaml_meta_to_pages(self):
-        # context['filenames'] is shared by all generators
-        for location, obj in self.context['filenames'].iteritems():
-            dirname, fname = os.path.split(location)
-            if obj is not None and isinstance(obj, Page):
-                self._add_yaml_meta_to_page(dirname, fname, obj)
-
-    def _build_sections(self):
-        # context['filenames'] is shared by all generators
-        for location, obj in self.context['filenames'].iteritems():
-            dirname, fname = os.path.split(location)
-            if fname == '_folder_.yml' and  obj is not None and obj.__class__.__name__ == 'DocMeta':
-                self._build_section_links(dirname, obj)
-
-    # Do not define a generate_output method (yet)
-    # def generate_output(self, writer):
-
-    def _folder_meta_for_location(self, location):
+    def _folder_meta_for_page(self, location):
         """Work up the location hierarchy looking for a _folder_.yml DocMeta content"""
         # Location is something like pages/sites/district/general-information/lcap-and-accountability-reports/lcap-and-accountability-reports.md
         # See if we have a pages/sites/district/general-information/lcap-and-accountability-reports/_folder_.yml
         dirname = os.path.dirname(location)
         print "checking %s " % dirname
         while dirname != '':
-            yaml_doc = os.path.join(dirname, '_folder_.yml')
-            if yaml_doc in self.context['filenames']:
-                return self.context['filenames'][yaml_doc]
+            yaml_filename = os.path.join(dirname, '_folder_.yml')
+            if yaml_filename in self.context['filenames']:
+                return self.context['filenames'][yaml_filename]
             dirname = os.path.dirname(dirname)
         return None
 
-    def _page_in_section(self, location, page):
-        meta = self._folder_meta_for_location(location)
-        if meta is not None and meta.template == 'section':
-            return meta
-        return None
+    def _add_yaml_meta_to_page(self, location, page):
+        doc_meta = self._doc_meta_for_page(location)
+        if doc_meta is not None:
+            print "page metadata is %r" % page.metadata
+            print "doc_meta metadata is %r" % doc_meta.metadata
+            for key in YAML_KEYS:
+                val = doc_meta.metadata.get(key, None)
+                if val is not None:
+                    page.metadata[key] = val
+            logger.debug('Updated meta for page %s' % location)
+        else:
+            logger.debug('No DocMeta for for page %s' % location)
+            page.metadata['title'] = fname
+
+    def _add_yaml_meta_to_pages(self):
+        for location, page in self.by_classes['Page'].iteritems():
+            self._add_yaml_meta_to_page(location, page)
+
+    def _build_section_links(self, folder, doc_meta):
+        doc_links = [ ]
+        for location, page in self.by_classes['Page'].iteritems():
+            dirname, fname = os.path.split(location)
+            if dirname == folder:
+                doc_links.append((page.metadata['title'], location))
+
+        subfolder_links = [ ]
+        for location, doc_meta in self.by_classes['DocMeta'].iteritems():
+            dirname, fname = os.path.split(location)
+            if fname == '_folder_.yml':
+                parent = os.path.dirname(dirname)
+                if parent == folder:
+                    subfolder_links.append((doc_meta.metadata['title'], dirname))
+
+        count = 0
+
+        doc_meta.metadata['contents'] = [ ]
+        for link in sorted(doc_links, key=lambda x: x[0]):
+            doc_meta.metadata['contents'].append({ 'title': link[0], 'location': link[1] })
+            count += 1
+
+        doc_meta.metadata['subtopics'] = [ ]
+        for link in sorted(subfolder_links, key=lambda x: x[0]):
+            doc_meta.metadata['subtopics'].append({ 'title': link[0], 'location': link[1] })
+            count += 1
+
+    def _build_sections(self):
+        for location, doc_meta in self.by_classes['DocMeta'].iteritems():
+            dirname, fname = os.path.split(location)
+            if fname == '_folder_.yml':
+                self._build_section_links(dirname, doc_meta)
+
         # print "pgen %r " % pgen.pages
         # print "sgen %r " % sgen.staticfiles
 
     def _set_sections_for_pages(self):
-        # context['filenames'] is shared by all generators
-        for location, page in self.context['filenames'].iteritems():
-            if page is not None and page.__class__.__name__ == 'Page':
-                section_meta = self._page_in_section(location, page)
-                if section_meta:
+        for location, page in self.by_classes['Page'].iteritems():
+            section_meta = self._folder_meta_for_page(location)
+            if section_meta is not None:
+                if 'contents' in section_meta.metadata:
                     page.template = 'section'
-                    doc_links = section_meta.metadata['contents']
-                    if len(doc_links) > 0:
-                        page.section_links = [(link['location'], link['title']) for link in doc_links]
-                        logger.debug('page at %s -> section_links %r' % (location, page.section_links))
+                    page.section_links = [(link['location'], link['title']) for link in doc_links]
+                    logger.debug('page at %s -> section_links %r' % (location, page.section_links))
+
+    def _categorize_filenames(self):
+        # context['filenames'] is shared by all generators
+        for location, obj in self.context['filenames'].iteritems():
+            classname = None
+            if obj is not None:
+                classname = obj.__class__.__name__
+                if not classname in self.by_classes:
+                    self.by_classes[classname] = { }
+                self.by_classes[classname][location] = obj
 
     def prepare_pages_for_output(self, pgen, sgen):
         """
@@ -313,6 +331,7 @@ class YamlGenerator(CachingGenerator):
         Fix up templates and for pages in sections.
         Fix up links in pages that point to other Google Docs.
         """
+        self._categorize_filenames()
         self._add_yaml_meta_to_pages()
         self._build_sections()
         self._set_sections_for_pages()

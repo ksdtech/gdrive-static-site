@@ -5,7 +5,6 @@ import re
 import sys
 import yaml
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../bleach'))
 from bleach import clean
 
 # mozilla/bleach and or html5lib tokenizer/sanitizer still have some bugs
@@ -17,6 +16,12 @@ from bleach import clean
 ENTITY_REPLACEMENTS = {
     '\xa0': '&nbsp;'
 }
+
+def make_raw_filename(basename):
+    return '_raw_' + basename
+
+def make_meta_filename(basename):
+    return '_meta_' + basename + '.yml'
 
 def swap_entities(text):
     for k, v in ENTITY_REPLACEMENTS.items():
@@ -164,7 +169,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dirname, basename = os.path.split(args.file_name)
-    file_from = os.path.join(dirname, '_raw_' + basename + '.x')
+    rawname = make_raw_filename(basename)
+    file_from = os.path.join(dirname, rawname)
     file_to = os.path.join(dirname, basename)
     meta_name = '_meta_' + basename + '.yml'
     metadata = yaml.load(codecs.open(os.path.join(dirname, meta_name), 'r', 'utf-8'))
