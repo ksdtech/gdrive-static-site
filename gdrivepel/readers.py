@@ -90,17 +90,6 @@ class YamlReader(BaseReader):
         self._source_path = source_path
         with pelican_open(source_path) as text:
             metadata = yaml.load(text)
-        fname = os.path.basename(source_path)
-
-        # Special processing for _navmenu_.yml files
-        if fname == '_navmenu_.yml':
-            # Read selected gdrive metadata 
-            meta_navmenu_path = os.path.join(os.path.dirname(source_path), '_meta__navmenu_.yml.yml')
-            with pelican_open(meta_navmenu_path) as meta:
-                gdrive_meta = yaml.load(meta)
-                for key in [ 'author', 'basename', 'date', 'dirname', 'email', 'modified',
-                    'source_id', 'source_type', 'version' ]:
-                    metadata[key] = gdrive_meta[key]
 
         for key in ['date', 'modified']:
             metadata[key] = dateutil.parser.parse(metadata[key])

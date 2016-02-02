@@ -4,8 +4,8 @@
 <section id="section-contents" class="body">
     <h1>Contents</h1>
     <ul>
-    {% for stext, shref in page.section_links %}
-      <li><a href="{{ shref }}">{{ stext }}</a></li>
+    {% for link in page.section_links %}
+      <li><a href="{{ link['location'] }}">{{ link['title'] }}</a></li>
     {% endfor %}
     </ul>
 </section>

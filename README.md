@@ -67,7 +67,7 @@ See Pelican docs for more information.
 
 4. Generate the site:
 
-        pelican pelican/content -D -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
+        pelican pelican/content -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
 
 '-D' flag is for debug output
 '-d' flag is to delete the output directory first

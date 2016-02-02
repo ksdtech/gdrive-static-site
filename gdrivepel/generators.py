@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os.path
 import sys
@@ -137,10 +139,11 @@ logger = logging.getLogger(__name__)
 """
 
 YAML_GENERATOR_IGNORE_FILES = ['_raw_*.*', '.#*']
-YAML_KEYS = [ 'author', 'basename_raw', 'date',
+YAML_METADATA_KEYS = [ 'author', 'basename_raw', 'date',
     'email', 'exported_type', 'modified', 'relative_url',
     'slug', 'source_id', 'source_type', 'summary', 'template',
     'title', 'version' ]
+CONTENT_CLASSES = [ 'Doc', 'Page', 'Static', 'DocMeta', 'NavMenu' ]
 
 class YamlGenerator(CachingGenerator):
     """
@@ -244,7 +247,6 @@ class YamlGenerator(CachingGenerator):
         # Location is something like pages/sites/district/general-information/lcap-and-accountability-reports/lcap-and-accountability-reports.md
         # See if we have a pages/sites/district/general-information/lcap-and-accountability-reports/_folder_.yml
         dirname = os.path.dirname(location)
-        print "checking %s " % dirname
         while dirname != '':
             yaml_filename = os.path.join(dirname, '_folder_.yml')
             if yaml_filename in self.context['filenames']:
@@ -255,9 +257,7 @@ class YamlGenerator(CachingGenerator):
     def _add_yaml_meta_to_page(self, location, page):
         doc_meta = self._doc_meta_for_page(location)
         if doc_meta is not None:
-            print "page metadata is %r" % page.metadata
-            print "doc_meta metadata is %r" % doc_meta.metadata
-            for key in YAML_KEYS:
+            for key in YAML_METADATA_KEYS:
                 val = doc_meta.metadata.get(key, None)
                 if val is not None:
                     page.metadata[key] = val
@@ -267,15 +267,19 @@ class YamlGenerator(CachingGenerator):
             page.metadata['title'] = fname
 
     def _add_yaml_meta_to_pages(self):
-        for location, page in self.by_classes['Page'].iteritems():
+        for location, page in self.by_classes['Doc'].iteritems():
             self._add_yaml_meta_to_page(location, page)
 
-    def _build_section_links(self, folder, doc_meta):
+    def _build_section_links(self, folder, section_meta):
         doc_links = [ ]
-        for location, page in self.by_classes['Page'].iteritems():
+        for location, doc in self.by_classes['Doc'].iteritems():
             dirname, fname = os.path.split(location)
             if dirname == folder:
-                doc_links.append((page.metadata['title'], location))
+                if 'title' in doc.metadata:
+                    doc_links.append((doc.metadata['title'], location))
+                else:
+                    print('No title for %s at %s' % (doc.__class__.__name__, location))
+                    sys.exit(1)
 
         subfolder_links = [ ]
         for location, doc_meta in self.by_classes['DocMeta'].iteritems():
@@ -285,17 +289,13 @@ class YamlGenerator(CachingGenerator):
                 if parent == folder:
                     subfolder_links.append((doc_meta.metadata['title'], dirname))
 
-        count = 0
-
-        doc_meta.metadata['contents'] = [ ]
+        section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
-            doc_meta.metadata['contents'].append({ 'title': link[0], 'location': link[1] })
-            count += 1
+            section_meta.metadata['contents'].append({ 'title': link[0], 'location': link[1] })
 
-        doc_meta.metadata['subtopics'] = [ ]
+        section_meta.metadata['subtopics'] = [ ]
         for link in sorted(subfolder_links, key=lambda x: x[0]):
-            doc_meta.metadata['subtopics'].append({ 'title': link[0], 'location': link[1] })
-            count += 1
+            section_meta.metadata['subtopics'].append({ 'title': link[0], 'location': link[1] })
 
     def _build_sections(self):
         for location, doc_meta in self.by_classes['DocMeta'].iteritems():
@@ -303,27 +303,40 @@ class YamlGenerator(CachingGenerator):
             if fname == '_folder_.yml':
                 self._build_section_links(dirname, doc_meta)
 
-        # print "pgen %r " % pgen.pages
-        # print "sgen %r " % sgen.staticfiles
-
     def _set_sections_for_pages(self):
-        for location, page in self.by_classes['Page'].iteritems():
+        """
+        Set up the 'section' template and the 'section_links' for any
+        page that is in a 'section'.
+        """
+        for location in self.by_classes['Page'].iterkeys():
             section_meta = self._folder_meta_for_page(location)
             if section_meta is not None:
                 if 'contents' in section_meta.metadata:
+                    page = self.context['filenames'][location]
                     page.template = 'section'
-                    page.section_links = [(link['location'], link['title']) for link in doc_links]
-                    logger.debug('page at %s -> section_links %r' % (location, page.section_links))
+                    page.section_links = section_meta.metadata['contents']
 
     def _categorize_filenames(self):
-        # context['filenames'] is shared by all generators
+        """
+        Go through the global context's 'filenames' dict and create a new dict
+        that has the content's class name ('Page', 'Static', 'DocMeta', etc) as
+        the key.  Saves time when we want to find all Pages, etc.
+        """
+        for classname in CONTENT_CLASSES:
+            self.by_classes[classname] = { }
         for location, obj in self.context['filenames'].iteritems():
             classname = None
             if obj is not None:
                 classname = obj.__class__.__name__
-                if not classname in self.by_classes:
-                    self.by_classes[classname] = { }
-                self.by_classes[classname][location] = obj
+                if classname in CONTENT_CLASSES:
+                    self.by_classes[classname][location] = obj
+                else:
+                    logger.debug('Cannot categorize content item of class %s' % classname)
+
+                # Pseudo-class for docs
+                if classname in ['Page', 'Static']:
+                    classname = 'Doc'
+                    self.by_classes[classname][location] = obj
 
     def prepare_pages_for_output(self, pgen, sgen):
         """
