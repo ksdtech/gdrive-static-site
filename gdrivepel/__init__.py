@@ -183,42 +183,44 @@ class GDriveDownloader():
                 else:
                     local_title, exported_type = self.getLocalTitle(child)
 
-                    append_html = False
-                    if exported_type == 'text/html':
-                        append_html = True
+                    meta_name = file_name = local_title
 
-                    file_name = local_title
-                    if append_html:
+                    # Handle .yml files
+                    if re.search(r'\.yml$', file_name):
+                        if source_type == 'application/octet-stream':
+                            source_type = 'text/yaml'
+                            exported_type = None
+     
+                    # Handle .html and .md exported files
+                    if exported_type == 'text/html':
                         file_name += '.html'
 
-                    meta_name = make_meta_filename(file_name)
+                    raw_file_name = file_name
                     if exported_type in ['text/html', 'text/x-markdown']:
-                        file_name = make_raw_filename(file_name)
+                        raw_file_name = make_raw_filename(file_name)
 
-                    new_file = os.path.join(self.root_path, path_to, file_name)
+                    new_file = os.path.join(self.root_path, path_to, raw_file_name)
                     exists_check = os.path.exists(new_file)
                     if self.verbose:
                         print '  ' * (self.depth+1) + 'Trying to download "%s"' % child['title']
                     try:
+                        # Download the file
                         download_url = None
                         if exported_type in ['text/html'] and 'exportLinks' in child and exported_type in child['exportLinks']:
                             download_url = child['exportLinks'][exported_type]
                         elif 'downloadUrl' in child:
                             download_url = child['downloadUrl']
-
                         file_content = self.getDownloadContent(download_url)
-                        bytes_to_copy = len(file_content)
-                        with open(new_file, 'w+') as f:
-                            f.write(file_content)
 
                         # Original file name, stripped of .md and .html
-                        title = re.sub(r'(^_|\.(md|html)$)', '', child['title'], flags=re.IGNORECASE)
-                        # Lower-case slug, stripped of .md and .html
+                        title = re.sub(r'(^_|[_]*\.(yml|md|html)$)', '', child['title'], flags=re.IGNORECASE)
 
-                        slug = relative_url = re.sub(r'(\.(md|html)$)', '', local_title, flags=re.IGNORECASE)
-                        if re.search(r'\.(md|html)$', local_title):
-                            relative_url += '.html'
-                        if slug[:1] == '_':
+                        # Lower-case url, with .md converted to .html
+                        relative_url = re.sub(r'\.md$', '.html', local_title, flags=re.IGNORECASE)
+
+                        # Lower-case slug, stripped of .md, .html, and leading _
+                        slug = re.sub(r'\.(yml|md|html)$', '', local_title, flags=re.IGNORECASE)
+                        if slug[:1] == '_' and relative_url[-5:] == '.html':
                             slug = slug[1:]
 
                         # Pull description from Google Drive
@@ -226,7 +228,7 @@ class GDriveDownloader():
                         file_meta = {
                             'author': child['lastModifyingUserName'],
                             'basename': file_name,
-                            'basename_raw': file_name,
+                            'basename_raw': raw_file_name,
                             'date': child['createdDate'],
                             'dirname': path_to,
                             'email': child['lastModifyingUser']['emailAddress'],
@@ -243,12 +245,20 @@ class GDriveDownloader():
                         }
                         file_meta.update(gdrive_meta)
 
+                        if source_type == 'text/yaml':
+                            source_meta = yaml.load(file_content)
+                            file_meta.update(source_meta)
+                        else:
+                            self.writeContent(new_file, file_content)
+                            meta_name = make_meta_filename(file_name)
+
                         meta_file = os.path.join(self.root_path, path_to, meta_name)
                         self.writeMeta(meta_file, file_meta)
 
                         if self.verbose:
-                            print '  ' * (self.depth+1) + 'Copied %d bytes to file "%s"' % (bytes_to_copy, local_title)
-                        self.file_list.append((path_to, file_name, slug, meta_name, source_type, exported_type))
+                            print '  '*(self.depth+1) + ('Write to file "%s"' % new_file)
+                        if exported_type is not None:
+                            self.file_list.append((path_to, raw_file_name, file_name, meta_name, exported_type))
 
                     except Exception as e:
                         print 'Failed: %s\n' % e
@@ -270,22 +280,20 @@ class GDriveDownloader():
         with codecs.open(meta_file, 'w+', 'utf-8') as f:
             f.write(yaml_meta)
 
+    def writeContent(self, content_file, content):
+        # Using codecs will throw some decoding errors...
+        # with codecs.open(content_file, 'w+', 'utf-8') as f:
+        with open(content_file, 'w+') as f:
+            f.write(content)
+
     def postProcess(self):
-        self.file_list.sort()
-        for dirname, basename_raw, slug, meta_name, source_type, exported_type in self.file_list:
+        for dirname, basename_raw, basename, meta_name, exported_type in self.file_list:
             file_in = os.path.join(self.root_path, dirname, basename_raw)
+            file_out = os.path.join(self.root_path, dirname, basename)
             meta_file = os.path.join(self.root_path, dirname, meta_name)
             if exported_type == 'text/html':
-                basename = slug + '.html'
-                file_out = os.path.join(self.root_path, dirname, slug + '.html')
                 metadata = self.readMeta(meta_file)
-                metadata['basename'] = basename
                 sanitize_html_file(file_in, file_out, metadata)
-                self.writeMeta(meta_file, metadata)
             elif exported_type == 'text/x-markdown':
-                basename = slug + '.md'
-                file_out = os.path.join(self.root_path, dirname, slug + '.md')
                 metadata = self.readMeta(meta_file)
-                metadata['basename'] = basename
                 prepend_markdown_metadata(file_in, file_out, metadata)
-                self.writeMeta(meta_file, metadata)
