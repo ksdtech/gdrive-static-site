@@ -24,6 +24,13 @@
                 {% if page %}
                 {% for name, link, submenu in page.navmenu %}
                 <li><a href="{{ link }}">{{ name }}</a></li>
+                {% if submenu %}
+                    <ul>
+                    {% for subname, sublink, subsub in submenu %}
+                    <li><a href="{{ sublink }}">{{ subname }}</a></li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
                 {% endfor %}
                 {% else %}
                 <!-- no page.navmenu -->

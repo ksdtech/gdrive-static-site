@@ -7,7 +7,7 @@ import yaml
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-from sanitizer import (make_raw_filename, make_meta_filename, 
+from sanitizer import (slugify, make_raw_filename, make_meta_filename, 
     sanitize_html_file, prepend_markdown_metadata)
 
 # List of atributes that users can put in Google Drive, Markdown, HTML, etc.
@@ -36,7 +36,7 @@ class GDriveDownloader():
         local_title = item['title']
         file_type = None
         # Hyphenated, lower-case slug
-        local_title = re.sub(r'[^-._a-z0-9]', '-', local_title, flags=re.IGNORECASE).lower()
+        local_title = slugify(local_title) 
         if item['mimeType'] == 'application/vnd.google-apps.document':
             if item['kind'] == 'drive#file' and 'exportLinks' in item and 'text/html' in item['exportLinks']:
                 file_type = 'text/html'

@@ -9,7 +9,7 @@ from pelican.generators import CachingGenerator, PagesGenerator
 
 from gdrivepel.contents import Page, DocMeta, NavMenu
 from gdrivepel.readers import YamlReader
-from gdrivepel.sanitizer import make_meta_filename
+from gdrivepel.sanitizer import slugify, make_meta_filename
 
 # logger for this file
 logger = logging.getLogger(__name__)
@@ -339,23 +339,28 @@ class YamlGenerator(CachingGenerator):
                     classname = 'Doc'
                     self.by_classes[classname][location] = obj
 
-    def _resolve_navmenu_item(self, item):
+    def _resolve_navmenu_item(self, item, dirname):
         name = item['title']
-        link = None
+        slug = slugify(name)
+        link = item.get('href', None)
         submenu = [ ]
         item_type = item['type']
         if item_type == 'link-local':
-            link = item['href']
+            # assert link is not None
+            pass
         elif item_type == 'doc':
-            link = '/sites/district/fake/fake.html'
+            link = os.path.join(dirname, slug + '.html')
         elif item_type == 'pdf':
-            link = '/sites/district/fake/fake.pdf'
-        elif item_type == 'parent':
-            for subitem in item['submenu']:
-                subname, sublink, subsub = self._resolve_navmenu_item(subitem)
-                if link is None and sublink is not None:
-                    link = sublink
-                submenu.append((subname, sublink, subsub))
+            link = os.path.join(dirname, slug + '.pdf')
+        elif item_type == 'section':
+            if 'submenu' in item:
+                for subitem in item['submenu']:
+                    subdir = os.path.join(dirname, slug)
+                    subname, sublink, subsub = self._resolve_navmenu_item(subitem, subdir)
+                    if link is None and sublink is not None:
+                        link = sublink
+                    submenu.append((subname, sublink, subsub))
+
         if link is None:
             link = '/sites/district/igiveup.html'
         return (name, link, submenu)
@@ -366,10 +371,10 @@ class YamlGenerator(CachingGenerator):
             navmenu = obj.metadata['navmenu']
             self.navmenus[dirname] = [ ]
             for item in navmenu:
-                name, link, submenu = self._resolve_navmenu_item(item)
+                name, link, submenu = self._resolve_navmenu_item(item, '/' + dirname)
                 self.navmenus[dirname].append((name, link, submenu))
-            # print('navmenu for %s' % dirname)
-            # print('%r' % self.navmenus[dirname])
+            print('navmenu for %s' % dirname)
+            print('%r' % self.navmenus[dirname])
 
     def _get_navmenu_for_page(self, location):
         dirname, filename = os.path.split(location)

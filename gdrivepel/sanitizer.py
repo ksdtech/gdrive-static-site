@@ -17,6 +17,9 @@ ENTITY_REPLACEMENTS = {
     '\xa0': '&nbsp;'
 }
 
+def slugify(title):
+    return re.sub(r'[^-._a-z0-9]', '-', title, flags=re.IGNORECASE).lower()
+
 def make_raw_filename(basename):
     return '_raw_' + basename
 
