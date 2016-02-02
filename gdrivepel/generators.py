@@ -160,6 +160,7 @@ class YamlGenerator(CachingGenerator):
         # directory tree
         self.docid_map = { }
         self.by_classes = { }
+        self.navmenus = { }
 
     def _patch_readers(self):
         """Remove existing readers and rebuild just with YamlReader."""
@@ -338,6 +339,55 @@ class YamlGenerator(CachingGenerator):
                     classname = 'Doc'
                     self.by_classes[classname][location] = obj
 
+    def _resolve_navmenu_item(self, item):
+        name = item['title']
+        link = None
+        submenu = [ ]
+        item_type = item['type']
+        if item_type == 'link-local':
+            link = item['href']
+        elif item_type == 'doc':
+            link = '/sites/district/fake/fake.html'
+        elif item_type == 'pdf':
+            link = '/sites/district/fake/fake.pdf'
+        elif item_type == 'parent':
+            for subitem in item['submenu']:
+                subname, sublink, subsub = self._resolve_navmenu_item(subitem)
+                if link is None and sublink is not None:
+                    link = sublink
+                submenu.append((subname, sublink, subsub))
+        if link is None:
+            link = '/sites/district/igiveup.html'
+        return (name, link, submenu)
+
+    def _build_navmenus(self):
+        for location, obj in self.by_classes['NavMenu'].iteritems():
+            dirname, filename = os.path.split(location)
+            navmenu = obj.metadata['navmenu']
+            self.navmenus[dirname] = [ ]
+            for item in navmenu:
+                name, link, submenu = self._resolve_navmenu_item(item)
+                self.navmenus[dirname].append((name, link, submenu))
+            # print('navmenu for %s' % dirname)
+            # print('%r' % self.navmenus[dirname])
+
+    def _get_navmenu_for_page(self, location):
+        dirname, filename = os.path.split(location)
+        for folder in self.navmenus:
+            l = len(folder)
+            if dirname[:l] == folder:
+                return self.navmenus[folder]
+        return None
+
+    def _set_navmenu_for_pages(self):
+        for location in self.by_classes['Page'].iterkeys():
+            page = self.by_classes['Page'][location]
+            navmenu = self._get_navmenu_for_page(location)
+            if navmenu is not None:
+                page.navmenu = navmenu
+            else:
+                page.navmenu = []
+
     def prepare_pages_for_output(self, pgen, sgen):
         """
         Add top-level navigation menu to all pages.
@@ -348,6 +398,8 @@ class YamlGenerator(CachingGenerator):
         self._add_yaml_meta_to_pages()
         self._build_sections()
         self._set_sections_for_pages()
+        self._build_navmenus()
+        self._set_navmenu_for_pages()
 
 
 def on_get_generators(pelican):

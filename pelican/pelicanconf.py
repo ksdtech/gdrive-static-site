@@ -38,6 +38,10 @@ TRANSLATION_FEED_ATOM = None
 AUTHOR_FEED_ATOM = None
 AUTHOR_FEED_RSS = None
 
+# We will build our own menu
+DISPLAY_PAGES_ON_MENU = False
+DISPLAY_CATEGORIES_ON_MENU = False
+
 # Blogroll
 LINKS = (('Pelican', 'http://getpelican.com/'),
          ('Python.org', 'http://python.org/'),
@@ -65,7 +69,6 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
 # Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
 
 from pelican import signals
 from pelican.readers import HTMLReader
