@@ -142,7 +142,7 @@ YAML_GENERATOR_IGNORE_FILES = ['_raw_*.*', '.#*']
 YAML_METADATA_KEYS = [ 'author', 'basename_raw', 'date',
     'email', 'exported_type', 'modified', 'relative_url',
     'slug', 'source_id', 'source_type', 'summary', 'template',
-    'title', 'version' ]
+    'sorted_title', 'sort_priority', 'title', 'version' ]
 CONTENT_CLASSES = [ 'Doc', 'Page', 'Static', 'DocMeta', 'NavMenu' ]
 
 class YamlGenerator(CachingGenerator):
@@ -271,13 +271,18 @@ class YamlGenerator(CachingGenerator):
         for location, page in self.by_classes['Doc'].iteritems():
             self._add_yaml_meta_to_page(location, page)
 
+    def _href_for_location(self, location):
+        return os.path.join(self.settings['SITEURL'], location)
+
     def _build_section_links(self, folder, section_meta):
         doc_links = [ ]
         for location, doc in self.by_classes['Doc'].iteritems():
             dirname, fname = os.path.split(location)
             if dirname == folder:
                 if 'title' in doc.metadata:
-                    doc_links.append((doc.metadata['title'], location))
+                    title = doc.metadata['title']
+                    doc_links.append(
+                        (doc.metadata.get('sorted_title', title), title, location))
                 else:
                     print('No title for %s at %s' % (doc.__class__.__name__, location))
                     sys.exit(1)
@@ -288,15 +293,25 @@ class YamlGenerator(CachingGenerator):
             if fname == '_folder_.yml':
                 parent = os.path.dirname(dirname)
                 if parent == folder:
-                    subfolder_links.append((doc_meta.metadata['title'], dirname))
+                    if 'title' in doc_meta.metadata:
+                        title = doc_meta.metadata['title']
+                        subfolder_links.append(
+                            (doc_meta.metadata.get('sorted_title', title), title, dirname))
+                    else:
+                        print('No title for %s at %s' % (doc_meta.__class__.__name__, location))
+                        sys.exit(1)
 
         section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
-            section_meta.metadata['contents'].append({ 'title': link[0], 'location': link[1] })
+            section_meta.metadata['contents'].append({ 
+                'title': link[1], 
+                'location': self._href_for_location(link[2]) })
 
         section_meta.metadata['subtopics'] = [ ]
         for link in sorted(subfolder_links, key=lambda x: x[0]):
-            section_meta.metadata['subtopics'].append({ 'title': link[0], 'location': link[1] })
+            section_meta.metadata['subtopics'].append({ 
+                'title': link[1], 
+                'location': self._href_for_location(link[2]) })
 
     def _build_sections(self):
         for location, doc_meta in self.by_classes['DocMeta'].iteritems():

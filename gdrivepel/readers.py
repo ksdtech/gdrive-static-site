@@ -91,6 +91,8 @@ class YamlReader(BaseReader):
         with pelican_open(source_path) as text:
             metadata = yaml.load(text)
 
+        # Turn these into Python date objects
         for key in ['date', 'modified']:
-            metadata[key] = dateutil.parser.parse(metadata[key])
+            if key in metadata:
+                metadata[key] = dateutil.parser.parse(metadata[key])
         return content, metadata

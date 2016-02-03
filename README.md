@@ -34,12 +34,38 @@ https://github.com/Socialsquare/google-drive-migrator
         pip install -r requirements.txt
 
 7. Download and post-process files. copy\_folder takes two arguments: The Google Drive item id 
-of the top-level folder to start downloading with, and a path to download that folder to.  
-The final path component of the path should be "pages". Pelican will process these as static pages
-underneath the parent folder.  The recommended path should be "./pelican/content/pages" but
-you can put the "content/pages" part anywhere that you wish.  Example:
+of the top-level folder to start downloading with, and a path to download that folder to 
+(a folder with the "slugified" name of the Google Drive folder will be created within
+the target folder).  Then Pelican will process files within the target as static pages
+underneath the parent folder. 
 
-        python copy_folder.py 0B93xtFAz_q1FQmdILTVtcGRIZlk pelican/content/pages 
+As an example, let's say the Google Drive folder with id "0B93xtFAz_q1FQmdILTVtcGRIZlk" is named
+"Sites". Then we execute this command:
+
+        python copy_folder.py 0B93xtFAz_q1FQmdILTVtcGRIZlk pelican
+
+And we will end up with a "sites" folder inside the "pelican" folder.  Hint: don't use 
+"output" as the target folder name. For the following discussion let's assume we end
+up with this directory tree on our local disk:
+
+        gdrive-static-site/
+            pelican/
+                pelicanconf.py
+                sites/
+                    district/
+                         pages/
+                             about-our-district.md
+                             district-logo.png
+                    bacich/
+                         pages/
+                             about-bacich-school.md
+                             bacich-logo.png
+                    kent/
+                         pages/
+                             about-kent-school.md
+                             kent-logo.png
+                output/
+                     ... pelican will place output here ...
 
 
 Pelican Configuration
@@ -52,11 +78,14 @@ for more information. Example:
         SITENAME = u'Kentfield School District'
         SITEURL = 'http://127.0.0.1:8088/ksd'
 
-        PATH = 'content'
+        PATH = 'sites'
+
+        # We will look for .html and .md files here
+        PAGE_PATHS = [ 'district', 'bacich', 'kent' ]
 
         # We have some static files here, too
-        STATIC_PATHS = ['pages']
-        # STATIC_EXCLUDE_SOURCES = True
+        STATIC_PATHS = PAGE_PATHS
+        STATIC_EXCLUDE_SOURCES = True
 
         IGNORE_FILES = ['.#*', '.yml', '_*.*']
 
@@ -67,7 +96,7 @@ See Pelican docs for more information.
 
 4. Generate the site:
 
-        pelican pelican/content -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
+        pelican pelican/sites -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
 
 '-D' flag is for debug output
 '-d' flag is to delete the output directory first
