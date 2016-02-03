@@ -33,10 +33,30 @@ class GDriveDownloader():
         self.gauth.Authorize()
 
     def getLocalTitle(self, item):
-        local_title = item['title']
+        local_title = None
+        cleaned_title = None
+        sort_priority = None
+        sorted_title = None
+        title = item['title'].strip()
+
+        m = re.match(r'^(([0-9]{3})\]\s*)(.+)$', title)
+        if m:
+            # Hyphenated, lower-case slug
+            title = m.group(3)
+            local_title = slugify(title)
+            sort_priority = int(m.group(2))
+            # Original file name, stripped of leading underscore or trailing extensions
+            cleaned_title = re.sub(r'(^_|[_]*\.(pdf|yml|md|html)$)', '', title, flags=re.IGNORECASE)
+            sorted_title = m.group(2) + ']' + cleaned_title
+        else:
+            # Hyphenated, lower-case slug
+            local_title = slugify(title)
+            sort_priority = 999
+            # Original file name, stripped of leading underscore or trailing extensions
+            cleaned_title = re.sub(r'(^_|[_]*\.(pdf|yml|md|html)$)', '', title, flags=re.IGNORECASE)
+            sorted_title = '999]' + cleaned_title
+
         file_type = None
-        # Hyphenated, lower-case slug
-        local_title = slugify(local_title) 
         if item['mimeType'] == 'application/vnd.google-apps.document':
             if item['kind'] == 'drive#file' and 'exportLinks' in item and 'text/html' in item['exportLinks']:
                 file_type = 'text/html'
@@ -46,7 +66,7 @@ class GDriveDownloader():
         if self.verbose:
             print 'localTitle for "%s" kind "%s" mime "%s" ' % (item['title'], item['kind'], item['mimeType'])
             print 'returning "%s" file_type "%s"' % (local_title, file_type)
-        return (local_title, file_type)
+        return (local_title, cleaned_title, sorted_title, sort_priority, file_type)
 
     # Pull description from Google Drive
     # If there is '---' at the end of description, parse remaining bits as yaml.
@@ -95,7 +115,7 @@ class GDriveDownloader():
         return content
 
     def makeFolder(self, folder_item, path_to):
-        local_title, exported_type = self.getLocalTitle(folder_item)
+        local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(folder_item)
         cur_path = None
         new_path = None
         new_folder = None
@@ -128,9 +148,11 @@ class GDriveDownloader():
             'slug': local_title,
             'source_id': folder_item['id'],
             'source_type': folder_item['mimeType'],
+            'sort_priority': sort_priority,
+            'sorted_title': sorted_title,
             'summary': None, # TODO
             'template': None, # TODO
-            'title': folder_item['title'],
+            'title': cleaned_title,
             'modified': folder_item['modifiedDate'],
             'version': folder_item['version']
         }
@@ -181,7 +203,7 @@ class GDriveDownloader():
                     self.recursiveDownloadInto(child['id'], new_folder)
 
                 else:
-                    local_title, exported_type = self.getLocalTitle(child)
+                    local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(child)
 
                     meta_name = file_name = local_title
 
@@ -212,13 +234,11 @@ class GDriveDownloader():
                             download_url = child['downloadUrl']
                         file_content = self.getDownloadContent(download_url)
 
-                        # Original file name, stripped of .md and .html
-                        title = re.sub(r'(^_|[_]*\.(yml|md|html)$)', '', child['title'], flags=re.IGNORECASE)
-
                         # Lower-case url, with .md converted to .html
                         relative_url = re.sub(r'\.md$', '.html', local_title, flags=re.IGNORECASE)
 
-                        # Lower-case slug, stripped of .md, .html, and leading _
+                        # Lower-case slug, stripped of .yml, .md, .html, and leading _
+                        # .pdf and image extensions are left alone
                         slug = re.sub(r'\.(yml|md|html)$', '', local_title, flags=re.IGNORECASE)
                         if slug[:1] == '_' and relative_url[-5:] == '.html':
                             slug = slug[1:]
@@ -237,9 +257,11 @@ class GDriveDownloader():
                             'slug': slug,
                             'source_id': child['id'],
                             'source_type': source_type,
+                            'sort_priority': sort_priority,
+                            'sorted_title': sorted_title,
                             'summary': None,
                             'template': None,
-                            'title': title,
+                            'title': cleaned_title,
                             'modified': child['modifiedDate'],
                             'version': child['version']
                         }
