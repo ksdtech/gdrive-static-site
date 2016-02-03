@@ -116,7 +116,8 @@ def head(metadata):
         '<title>%s</title>' % cgi.escape(title) ]
     for name, content in metadata.iteritems():
         if content and name not in MY_EXCLUDED_META_NAMES:
-            head_lines.append('<meta name="%s" content="%s">' % (name, cgi.escape(content)))
+            value = cgi.escape(str(content).replace("&", "&amp;")) 
+            head_lines.append('<meta name="%s" content="%s">' % (name, value))
     head_lines.append('</head>')
     return '\n'.join(head_lines)
 

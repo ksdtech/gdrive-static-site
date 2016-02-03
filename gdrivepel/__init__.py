@@ -278,7 +278,7 @@ class GDriveDownloader():
                         self.writeMeta(meta_file, file_meta)
 
                         if self.verbose:
-                            print '  '*(self.depth+1) + ('Write to file "%s"' % new_file)
+                            print '  '*(self.depth+1) + ('Write to file "%s" exported as %s' % (new_file, exported_type))
                         if exported_type is not None:
                             self.file_list.append((path_to, raw_file_name, file_name, meta_name, exported_type))
 
@@ -309,6 +309,9 @@ class GDriveDownloader():
             f.write(content)
 
     def postProcess(self):
+        if self.verbose:
+            print 'Post-processing %d files' % len(self.file_list)
+
         for dirname, basename_raw, basename, meta_name, exported_type in self.file_list:
             file_in = os.path.join(self.root_path, dirname, basename_raw)
             file_out = os.path.join(self.root_path, dirname, basename)
