@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import codecs
 import os.path
 from pprint import pprint as pp
@@ -24,7 +26,7 @@ class GDriveDownloader():
         self.maxdepth = maxdepth
         self.verbose = verbose
         self.file_list = [ ]
-        print "maxdepth %d, verbose %r" % (maxdepth, verbose)
+        print('GDriveDownloader maxdepth %d, verbose %r' % (maxdepth, verbose))
 
     def authorize(self):
         self.gauth = GoogleAuth()
@@ -64,8 +66,8 @@ class GDriveDownloader():
             file_type = 'text/x-markdown'
 
         if self.verbose:
-            print 'localTitle for "%s" kind "%s" mime "%s" ' % (item['title'], item['kind'], item['mimeType'])
-            print 'returning "%s" file_type "%s"' % (local_title, file_type)
+            print('localTitle for "%s" kind "%s" mime "%s" ' % (item['title'], item['kind'], item['mimeType']))
+            print('returning "%s" file_type "%s"' % (local_title, file_type))
         return (local_title, cleaned_title, sorted_title, sort_priority, file_type)
 
     # Pull description from Google Drive
@@ -79,10 +81,6 @@ class GDriveDownloader():
             if yaml_i >= 0:
                 raw_meta = yaml.load(description[yaml_i:].strip())
                 description = description[:yaml_i].strip()
-                if self.verbose:
-                    print 'split description and meta at %d' % yaml_i
-                    print 'description: "%s"' % description
-                    print 'meta: %r' % raw_meta
             if len(description) == 0:
                 description = None
 
@@ -91,16 +89,12 @@ class GDriveDownloader():
             # No yaml part - create one     
             if description is not None:
                 gdrive_meta['summary'] = description
-                if self.verbose:
-                    print 'returning description in meta: %r' % gdrive_meta
         else:
             # Update yaml part
             if description is not None and 'summary' not in raw_meta:
                 raw_meta['summary'] = description
             for key in [k for k in USER_META_KEYS if k in raw_meta and raw_meta[k] is not None]:
                 gdrive_meta[key] = raw_meta[key]
-            if self.verbose:
-                print 'returning meta: %r' % gdrive_meta
         return gdrive_meta
 
     def getDownloadContent(self, download_url):
@@ -132,7 +126,7 @@ class GDriveDownloader():
         if not exists_check:
             os.mkdir(new_folder)
             if self.verbose:
-                print '  ' * self.depth + 'Created folder "%s" in "%s"' % (local_title, cur_path)
+                print('Created folder "%s" in "%s"' % (local_title, cur_path))
 
         # Pull description from Google Drive
         gdrive_meta = self.parseGDriveMeta(folder_item)
@@ -165,7 +159,7 @@ class GDriveDownloader():
     def recursiveDownloadInto(self, fID_from, path_to):
         if self.depth > self.maxdepth:
             if self.verbose:
-                print '  ' * self.depth + 'Maximum depth %d exceeded' % self.depth
+                print('Maximum depth %d exceeded' % self.depth)
             return
 
         if not self.gauth:
@@ -173,15 +167,15 @@ class GDriveDownloader():
 
         item = self.gauth.service.files().get(fileId=fID_from).execute()
         if self.verbose:
-            print '  ' * self.depth + 'Recursively downloading "%s" (id: %s)' % (item['title'], item['id'])
-            print '  ' * self.depth + 'into folder: %s' % path_to
+            print('Recursively downloading "%s" (id: %s)' % (item['title'], item['id']))
+            print('  into folder %s at depth %d' % (path_to, self.depth))
 
         if self.depth == 0:
             if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
                 self.root_path = path_to
                 path_to = self.makeFolder(item, '')
             else:
-                print  '  ' * self.depth + 'Top level item is not a folder'
+                print('Top level item is not a folder')
                 return
 
         # Go through children with pagination
@@ -193,7 +187,7 @@ class GDriveDownloader():
             # result = self.gauth.service.children().list(folderId=fID_from).execute()
             for child in result['items']:
                 if child['kind'] != 'drive#file':
-                    print 'Unknown object type (not file or folder): "%s"' % child['kind']
+                    print('Unknown object type (not file or folder): "%s"' % child['kind'])
                     pp(child)
 
                 source_type = child['mimeType']
@@ -201,6 +195,9 @@ class GDriveDownloader():
                     self.depth += 1
                     new_folder = self.makeFolder(child, path_to)
                     self.recursiveDownloadInto(child['id'], new_folder)
+                    self.depth -= 1
+                    print('Returned from "%s" (id: %s)' % (child['title'], child['id']))
+                    print('  back in folder %s at depth %d' % (path_to, self.depth))
 
                 else:
                     local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(child)
@@ -209,10 +206,17 @@ class GDriveDownloader():
 
                     # Handle .yml files
                     if re.search(r'\.yml$', file_name):
-                        if source_type == 'application/octet-stream':
+                        # Depending on how you edit or upload .yml files in Google Drive
+                        # The mime type reported could be text/plain or application/octet-stream
+                        # Avoid improperly dealing with Google Docs or Sheets inadvertently saved with .yml extension
+                        if re.match(r'(text|application)\/', source_type) and not re.match(r'application\/vnd\.google-apps', source_type):
                             source_type = 'text/yaml'
                             exported_type = None
-     
+                        else:
+                            if self.verbose:
+                                print('Unknown source type for .yml file: ' % source_type)
+                                sys.exit(1)
+
                     # Handle .html and .md exported files
                     if exported_type == 'text/html':
                         file_name += '.html'
@@ -224,7 +228,7 @@ class GDriveDownloader():
                     new_file = os.path.join(self.root_path, path_to, raw_file_name)
                     exists_check = os.path.exists(new_file)
                     if self.verbose:
-                        print '  ' * (self.depth+1) + 'Trying to download "%s"' % child['title']
+                        print('Trying to download "%s"' % child['title'])
                     try:
                         # Download the file
                         download_url = None
@@ -278,12 +282,12 @@ class GDriveDownloader():
                         self.writeMeta(meta_file, file_meta)
 
                         if self.verbose:
-                            print '  '*(self.depth+1) + ('Write to file "%s" exported as %s' % (new_file, exported_type))
+                            print('Write to file "%s" exported as %s' % (new_file, exported_type))
                         if exported_type is not None:
                             self.file_list.append((path_to, raw_file_name, file_name, meta_name, exported_type))
 
                     except Exception as e:
-                        print 'Failed: %s\n' % e
+                        print('  Failed: %s\n' % e)
                         raise
 
             # Get page
@@ -310,7 +314,7 @@ class GDriveDownloader():
 
     def postProcess(self):
         if self.verbose:
-            print 'Post-processing %d files' % len(self.file_list)
+            print('Post-processing %d files' % len(self.file_list))
 
         for dirname, basename_raw, basename, meta_name, exported_type in self.file_list:
             file_in = os.path.join(self.root_path, dirname, basename_raw)
