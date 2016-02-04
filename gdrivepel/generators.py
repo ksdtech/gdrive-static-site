@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import logging
 import os.path
+import re
 import sys
 
 from pelican.contents import is_valid_content
@@ -14,6 +15,11 @@ from gdrivepel.sanitizer import slugify, make_meta_filename
 # logger for this file
 logger = logging.getLogger(__name__)
 
+class IllformedNavmenuError(Exception):
+    pass
+
+class IllformedSectionError(Exception):
+    pass
 
 # Here are the settings that we can read in the readers object.
 # We set the 'yaml_only_reader' setting in the YamlGenerator instance
@@ -233,7 +239,6 @@ class YamlGenerator(CachingGenerator):
                 self.cache_data(f, doc_meta)
                 self.add_source_path(doc_meta)
 
-
     def _doc_meta_for_page(self, location):
         dirname, fname = os.path.split(location)
         meta_filename = make_meta_filename(fname)
@@ -272,7 +277,7 @@ class YamlGenerator(CachingGenerator):
             self._add_yaml_meta_to_page(location, page)
 
     def _href_for_location(self, location):
-        return os.path.join(self.settings['SITEURL'], location)
+        return os.path.join(self.settings['SITEURL'], re.sub(r'^\/', '', location))
 
     def _build_section_links(self, folder, section_meta):
         doc_links = [ ]
@@ -284,8 +289,7 @@ class YamlGenerator(CachingGenerator):
                     doc_links.append(
                         (doc.metadata.get('sorted_title', title), title, location))
                 else:
-                    print('No title for %s at %s' % (doc.__class__.__name__, location))
-                    sys.exit(1)
+                    raise IllformedSectionError('No title for doc %s at %s' % (doc.__class__.__name__, location))
 
         subfolder_links = [ ]
         for location, doc_meta in self.by_classes['DocMeta'].iteritems():
@@ -298,8 +302,7 @@ class YamlGenerator(CachingGenerator):
                         subfolder_links.append(
                             (doc_meta.metadata.get('sorted_title', title), title, dirname))
                     else:
-                        print('No title for %s at %s' % (doc_meta.__class__.__name__, location))
-                        sys.exit(1)
+                        raise IllformedSectionError('No title for subfolder %s at %s' % (doc_meta.__class__.__name__, location))
 
         section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
@@ -360,36 +363,52 @@ class YamlGenerator(CachingGenerator):
         link = item.get('href', None)
         submenu = [ ]
         item_type = item['type']
-        if item_type == 'link-local':
-            # assert link is not None
-            pass
-        elif item_type == 'doc':
-            link = os.path.join(dirname, slug + '.html')
-        elif item_type == 'pdf':
-            link = os.path.join(dirname, slug + '.pdf')
-        elif item_type == 'section':
-            if 'submenu' in item:
-                for subitem in item['submenu']:
-                    subdir = os.path.join(dirname, slug)
-                    subname, sublink, subsub = self._resolve_navmenu_item(subitem, subdir)
-                    if link is None and sublink is not None:
-                        link = sublink
-                    submenu.append((subname, sublink, subsub))
+        if item_type == 'include':
+            location = os.path.join(dirname, slug)
+            if location not in self.navmenus:
+                raise IllformedNavmenuError('cannot find included navmenu %s' % location)
+            print('including %d items for navmenu %s' % (len(self.navmenus[location]), location))
+            for (subname, sublink, subsub) in self.navmenus[location]:
+                if link is None and sublink is not None:
+                    link = sublink
+                submenu.append((subname, sublink, subsub))
+        elif 'submenu' in item:
+            if item_type not in ['section', 'folder']:
+                raise IllformedNavmenuError('submenu found for unknown type %s' % item_type)
+            for subitem in item['submenu']:
+                subdir = os.path.join(dirname, slug)
+                subname, sublink, subsub = self._resolve_navmenu_item(subitem, subdir)
+                if link is None and sublink is not None:
+                    link = sublink
+                submenu.append((subname, sublink, subsub))
+        elif link is None:
+            if item_type in ['link-local', 'link-external']:
+                raise IllformedNavmenuError('link missing for %s type' % item_type) 
+            elif item_type == 'doc':
+                link = os.path.join(dirname, slug + '.html')
+            elif item_type == 'pdf':
+                link = os.path.join(dirname, slug + '.pdf')
+        elif item_type not in ['link-local', 'link-external']:
+                raise IllformedNavmenuError('link supplied for %s type' % item_type) 
 
         if link is None:
-            link = '/sites/district/igiveup.html'
+            link = '/404.html?context=navmenu&slug=%s&dir=%s' % (slug, dirname)
+        if not re.match(r'(http[s]?|ftp|mailto)\:', link):
+            link = self._href_for_location(link)
         return (name, link, submenu)
 
     def _build_navmenus(self):
-        for location, obj in self.by_classes['NavMenu'].iteritems():
+        # Build deepest navmenus first, because they may be included by shorter ones
+        navmenu_paths = sorted(self.by_classes['NavMenu'].keys(), key=lambda path: -len(path))
+        for location in navmenu_paths:
+            obj = self.by_classes['NavMenu'][location]
             dirname, filename = os.path.split(location)
             navmenu = obj.metadata['navmenu']
             self.navmenus[dirname] = [ ]
+            print('_build_navmenus at %s' % dirname)
             for item in navmenu:
-                name, link, submenu = self._resolve_navmenu_item(item, '/' + dirname)
+                name, link, submenu = self._resolve_navmenu_item(item, dirname)
                 self.navmenus[dirname].append((name, link, submenu))
-            print('navmenu for %s' % dirname)
-            print('%r' % self.navmenus[dirname])
 
     def _get_navmenu_for_page(self, location):
         dirname, filename = os.path.split(location)

@@ -223,20 +223,43 @@ contained folders (called "subsections");
 
 Top-Level Navigation
 --------------------
-TBD
+There are two ways to add the top-level navigation menus: you can provide the global setti
+'AUTOMENU = True' to have the YamlGenerator build a 3-deep navigation menu based on pages
+found during processing, or supply "\_navmenu\_.yml" files with hard-coded links and other
+menu metadata in your Google Drive source.
 
-If a YAML file named "\_navmenu.yml" is located in the top level folder of a site,
+
+AUTOMENU
+========
+In your pelicanconf.py file, just add the line:
+
+    AUTOMENU = True
+
+Folders and pages found during processing will be added to the navigation menu up to three
+levels deep.  If a folder or page has the metadata attribute "menu\_title", it will be
+used rather than the "title" attribute.
+
+
+\_navmenu\_.yml Files
+=====================
+If a YAML file named "\_navmenu\_yml" is located in the top level "pages" folder of a site,
 it is used to build the primary navigation menus for the site.
-The "navmenu" is the top-level element in the YAML file.  The "navmenu" is a list of submenus. 
-Each submenu or item has a title and a type:
 
-- parent - this is a parent menu, and has a submenu list
-- link-local - this is a link to a URL on the same site
-- link-external - this is a link to a URL on an external site
-- pdf - this is a link to a downloadable PDF
-- doc - this is a link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
-- section - this is a link to a folder with a "template: section" description or
-containing a \_folder\_.yml file
+"navmenu" must be the top-level key in the YAML file.  The value of "navmenu" is a list of 
+menu items. Each item has a "title" and a "type" attribute. The available types are:
+
+- folder - This is a parent menu. The item must have a "submenu" key with a value of the 
+list of contained items.
+- section - Like "folder", but specifies a section.
+- link-local - A link to a URL on the same site. The item must have an "href" key with a 
+value specifying the URL.
+- link-external - Like "link-internal", but the "href" key specifies a link to a URL 
+on an external site.
+- doc - A link to an "internal" page or article written in Google Docs, Markdown or HTML. 
+If the "href" key is present on the item, it is used, otherwise a lookup by slug will be 
+done to find the link URL.
+- pdf - Like "doc", but this is a link to an "internal" downloadable PDF file.
+- include - Includes the menu of another \_navmenu\_.yml file found at this location.
 
 
 Breadcrumbs
@@ -283,7 +306,7 @@ are extracted, a slug is built based on the title, and the description is
 saved in a "summary" metadata field. Assume that the title
 was "General Information", then the slug would be "general-information".
 
-2. A metadata file named "\_folder\_general-information.yml" 
+2. A metadata file named "\_folder\_.yml" 
 is created with the sample content shown below. Note that the relative URL in the 
 metadata does not end in ".html": 
 
