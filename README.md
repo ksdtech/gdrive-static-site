@@ -261,6 +261,119 @@ done to find the link URL.
 - pdf - Like "doc", but this is a link to an "internal" downloadable PDF file.
 - include - Includes the menu of another \_navmenu\_.yml file found at this location.
 
+Here's an example (also showing the added document metadata added by the downloader):
+
+    ---
+    navmenu:
+    - title: Schools
+      type: include
+    - title: General Information
+      type: section
+      folder_id: 0B93xtFAz_q1FNXNNVXZpLVV5cFk
+      submenu:
+      - title: 2015-16 District Calendar
+        type: pdf
+      - title: District Overview
+        type: doc
+      - title: LCAP and Accountability Reports
+        type: section
+      - title: Policies
+        type: doc
+      - title: Parents Rights and Notifications
+        type: doc
+      - title: Registering
+        type: doc
+      - title: Parcel Tax Senior Exemption
+        type: doc
+      - title: District Office Staff Directory
+        type: doc
+    - title: School Board
+      type: folder
+      submenu:
+      - title: Board Memmbers
+        type: doc
+      - title: Board Goals
+        type: doc
+      - title: Board Meetings
+        type: doc
+      - title: Board Meeting Highlights
+        type: doc
+      - title: Strategic Plan
+        type: doc
+    - title: Administration
+      type: folder
+      submenu:
+      - title: Superintendent
+        type: doc
+      - title: Business Services
+        type: doc
+      - title: Maintenance and Facility Usage
+        type: doc
+      - title: Student Services
+        type: doc
+      - title: Technology
+        type: doc
+      - title: Human Resources
+        type: doc
+    - title: Programs
+      type: folder
+      submenu:
+      - title: Common Core Standards
+        type: doc
+      - title: Character Education and SEL
+        type: doc
+      - title: 'Health, Wellness and Nutrition'
+        type: doc
+    - title: Measure D
+      type: doc
+    - title: Get Involved
+      type: folder
+      submenu:
+      - href: 'http://kspta.org'
+        title: KSPTA
+        type: link-external
+      - href: 'http://kspta.org'
+        title: KSPTA Parent Education
+        type: link-external
+      - href: 'http://kikschools.org'
+        title: kik - Kentfield Schools Foundation
+        type: link-external
+      - title: Safe Routes to School
+        type: doc
+      - title: District Committees
+        type: doc
+      - title: Environmental Programs
+        type: doc
+    - title: Help
+      type: section
+      submenu:
+      - title: Help With This Website
+        type: doc
+      - title: PowerSchool Help
+        type: doc
+      - title: Emergency Text Messaging FAQ
+        type: doc
+      - title: Comments and Suggestions
+        type: doc
+    author: Kentfield Schools Webmaster
+    basename: _navmenu_.yml
+    basename_raw: _navmenu_.yml
+    date: '2015-11-03T18:51:03.286Z'
+    dirname: sites/district/pages
+    email: webmaster@kentfieldschools.org
+    exported_type: null
+    modified: '2015-11-05T18:00:43.499Z'
+    relative_url: _navmenu_.yml
+    slug: _navmenu_
+    sort_priority: 999
+    sorted_title: 999]navmenu
+    source_id: 0B93xtFAz_q1FUjFOY0Qxd0lxbVU
+    source_type: text/yaml
+    summary: null
+    template: null
+    title: navmenu
+    version: '12305'
+
 
 Breadcrumbs
 -----------
@@ -504,6 +617,9 @@ field or in a \_folder.yml file):
 - exported\_type: The MIME type of the downloaded (and possibly post-processed) file: "text/html", 
 "text/x-markdown", "text/x-yaml", image/...", etc.
 
+- menu\_title: When using AUTOMENU settings, if this string is present, it will be used to 
+build the top-level site navigation menu.
+
 - relative\_url: The URL that will be produced (relative to the dirname) for the document. Markdown
 and Google Doc 
 
@@ -513,6 +629,10 @@ be unique within a folder and never has a file extension.
 - source\_id: The Google Drive id for the document or folder.
 
 - source\_type: The MIME type of the source document as reported by Google Drive.
+
+- sort\_priority: Integer from 0 to 999, specifying sort order (read-only)
+
+- sorted\_title: Title with format "nnn]Rest of title", used to sort items in a section
 
 - summary: The "Description" attribute from Google Drive (stripped of leading and trailing whitespace
 and any YAML content that begins with '---'). Can be overridden in a \_folder.yml file.
@@ -546,22 +666,7 @@ Additional attributes found only in \_folder.yml:
 - top: null or the generated full_url of the top-most "section" contaning this folder.
 
 
-Attributes found only in \_navmenu.yml:
-
-- doc: A link to a page or article written in markdown. The name of the page content document is the menu item's title, plus the extension ".md"
-
-- link_external: A link to a URL on an external site
-
-- link_local: A link to a URL on the same site
-
-- parent: A parent menu that has a submenu list
-
-- pdf: A link to a downloadable PDF
-
-- section: A link to a folder with a "template: section" description or
-containing a \_folder\_.yml file
-
-- submenu: A list of links within this menu item.
+See the section on \_navmenu\_.yml files for details on a \_navmenu\_.yml file's structure.
 
 
 Pelican Phase and Settings
