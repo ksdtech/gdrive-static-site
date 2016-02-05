@@ -286,7 +286,7 @@ class YamlGenerator(CachingGenerator):
                 if 'title' in doc.metadata:
                     title = doc.metadata['title']
                     doc_links.append(
-                        (doc.metadata.get('sorted_title', title), title, location))
+                        (doc.metadata.get('sorted_title', title), title, doc.url))
                 else:
                     raise IllformedSectionError('No title for doc %s at %s' % (doc.__class__.__name__, location))
 

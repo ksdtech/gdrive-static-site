@@ -607,7 +607,7 @@ wish to generate.  Example:
       'district': {
         'PATH': 'sites/district',
         'SITENAME': 'Kentfield School District',
-        'SITEURL': 'http://127.0.0.1:8088/ksd',
+        'SITEURL': 'http://127.0.0.1:8088/ksd/district',
         'PAGE_PATHS': [ 'pages' ],
         'STATIC_PATHS': [ 'pages' ],
         'YAML_PATHS': [ '..' ],
@@ -616,7 +616,7 @@ wish to generate.  Example:
       'bacich': {
         'PATH': 'sites/bacich',
         'SITENAME': 'Bacich Elementary School',
-        'SITEURL': 'http://127.0.0.1:8088/ksd',
+        'SITEURL': 'http://127.0.0.1:8088/ksd/bacich',
         'PAGE_PATHS': [ 'pages' ],
         'STATIC_PATHS': [ 'pages' ],
         'YAML_PATHS': [ '..' ],
@@ -625,7 +625,7 @@ wish to generate.  Example:
       'kent': {
         'PATH': 'sites/kent',
         'SITENAME': 'Kent Middle School',
-        'SITEURL': 'http://127.0.0.1:8088/ksd',
+        'SITEURL': 'http://127.0.0.1:8088/ksd/kent',
         'PAGE_PATHS': [ 'pages' ],
         'STATIC_PATHS': [ 'pages' ],
         'YAML_PATHS': [ '..' ],
