@@ -4,12 +4,11 @@ from __future__ import unicode_literals
 import os.path
 import sys
 
-AUTHOR = 'webmaster@kentfieldschools.org'
-SITENAME = 'Kentfield School District'
-SITEURL = 'http://127.0.0.1:8088/ksd'
 
-# Base path for all source files
-PATH = 'sites' # os.path.join(os.path.abspath(os.path.dirname(__file__)), 'sites')
+
+AUTHOR = 'webmaster@kentfieldschools.org'
+# SITENAME = 'Kentfield School District'
+# SITEURL = 'http://127.0.0.1:8088/ksd'
 
 # Where to get articles (news / blog posts)
 # ARTICLE_PATHS = []
@@ -18,13 +17,13 @@ PATH = 'sites' # os.path.join(os.path.abspath(os.path.dirname(__file__)), 'sites
 # ARTICLE_EXCLUDES = []
 
 # Where to get pages
-PAGE_PATHS = [ 'district' ]
+# PAGE_PATHS = [ 'district' ]
 
 # Directories to exclude from page search
 # PAGE_EXCLUDES = []
 
 # Where to get static files (PDFs, images, etc.)
-STATIC_PATHS = PAGE_PATHS
+# STATIC_PATHS = PAGE_PATHS
 
 # Directories to exclude from static file search
 # STATIC_EXCLUDES  = []
@@ -71,13 +70,68 @@ SOCIAL = (('You can add links in your config file', '#'),
 DEFAULT_PAGINATION = 10
 LOAD_CONTENT_CACHE = False
 
+# Custom settings used by this project
+
+# If set to True, YamlGenerator will build top-level navigation system
+AUTOMENU = False
+
+# MULTISITE configuration (custom).
+# If present and not an empty list, this is a multi-site installation.
+# Otherwise it is a list of site prefix dictionaries
+MULTISITE = {
+  'district': {
+    'PATH': 'sites/district',
+    'SITENAME': 'Kentfield School District',
+    'SITEURL': 'http://127.0.0.1:8088/ksd',
+    'PAGE_PATHS': [ 'pages' ],
+    'STATIC_PATHS': [ 'pages' ],
+    'YAML_PATHS': [ '..' ],
+    'OUTPUT_PATH': 'output/district',
+  },
+  'bacich': {
+    'PATH': 'sites/bacich',
+    'SITENAME': 'Bacich Elementary School',
+    'SITEURL': 'http://127.0.0.1:8088/ksd',
+    'PAGE_PATHS': [ 'pages' ],
+    'STATIC_PATHS': [ 'pages' ],
+    'YAML_PATHS': [ '..' ],
+    'OUTPUT_PATH': 'output/bacich'
+  },
+  'kent': {
+    'PATH': 'sites/kent',
+    'SITENAME': 'Kent Middle School',
+    'SITEURL': 'http://127.0.0.1:8088/ksd',
+    'PAGE_PATHS': [ 'pages' ],
+    'STATIC_PATHS': [ 'pages' ],
+    'YAML_PATHS': [ '..' ],
+    'OUTPUT_PATH': 'output/kent'
+  }
+}
+
+# If MULTISITE is set, you need to run the pelican executable once for 
+# each site with a PELICAN_PATh environment variable set to the site's key
+# in the MULTISITE setting. Example:
+#
+# PELICAN_SITE=district pelican -d -D -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
+#
+if 'MULTISITE' in globals() and len(MULTISITE) > 0:
+    SUBSITE = os.getenv('PELICAN_SITE', None)
+    if SUBSITE is None:
+        print('PELICAN_SITE environment variable (with value in %s) is required for MULITSITE configuration' % ', '.join(MULTISITE.keys()))
+        sys.exit(2)
+    else:
+        for name, value in MULTISITE[SUBSITE].iteritems():
+            globals()[name] = value
+        print('MULTISITE for SUBSITE "%s"\n  PATH is "%s"\n  OUTPUT_PATH is "%s"' % (SUBSITE, PATH, OUTPUT_PATH))
+
 # Custom 'plugin' code for the gdrive-static-site project starts here.
 # All other plugin code is in the gdrivepel module.
 
-# Find patched bleach module
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
 # Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Find patched bleach module
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
 
 from pelican import signals
 from pelican.readers import HTMLReader

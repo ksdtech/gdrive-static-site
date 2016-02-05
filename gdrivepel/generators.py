@@ -206,9 +206,8 @@ class YamlGenerator(CachingGenerator):
         # Custom settings for self.get_files
         saved_ignore_files = self.settings['IGNORE_FILES']
         self.settings['IGNORE_FILES'] = YAML_GENERATOR_IGNORE_FILES
-        filelist = self.get_files(
-                self.settings['PAGE_PATHS'], 
-                exclude=[], extensions=('yml'))
+        paths = self.settings.get('YAML_PATHS', self.settings['PAGE_PATHS'])
+        filelist = self.get_files(paths, exclude=[], extensions=('yml'))
         self.settings['IGNORE_FILES'] = saved_ignore_files
 
         for f in filelist:
@@ -367,7 +366,6 @@ class YamlGenerator(CachingGenerator):
             location = os.path.join(dirname, slug)
             if location not in self.navmenus:
                 raise IllformedNavmenuError('cannot find included navmenu %s' % location)
-            print('including %d items for navmenu %s' % (len(self.navmenus[location]), location))
             for (subname, sublink, subsub) in self.navmenus[location]:
                 if link is None and sublink is not None:
                     link = sublink
@@ -405,7 +403,6 @@ class YamlGenerator(CachingGenerator):
             dirname, filename = os.path.split(location)
             navmenu = obj.metadata['navmenu']
             self.navmenus[dirname] = [ ]
-            print('_build_navmenus at %s' % dirname)
             for item in navmenu:
                 name, link, submenu = self._resolve_navmenu_item(item, dirname)
                 self.navmenus[dirname].append((name, link, submenu))
@@ -427,12 +424,18 @@ class YamlGenerator(CachingGenerator):
             else:
                 page.navmenu = []
 
-    def prepare_pages_for_output(self, pgen, sgen):
+    def prepare_pages_for_output(self):
         """
         Add top-level navigation menu to all pages.
         Fix up templates and for pages in sections.
         Fix up links in pages that point to other Google Docs.
         """
+        logger.debug('YamlGenerator docid_map')
+        for docid, content_list in self.docid_map.iteritems():
+            logger.debug('docid %s:' % docid)
+            for content in content_list:
+                logger.debug('  %s/ %s' % (content.metadata['dirname'], content.metadata['basename']))
+
         self._categorize_filenames()
         self._add_yaml_meta_to_pages()
         self._build_sections()
@@ -454,8 +457,6 @@ def on_all_generators_finalized(generators):
     Called when all generators have set up contexts.
     We will build the navigation menus and specify section templates for pages in sections.
     """
-    pgen = [p for p in generators if p.__class__.__name__ == 'PagesGenerator'][0]
-    sgen = [p for p in generators if p.__class__.__name__ == 'StaticGenerator'][0]
     ygen = [p for p in generators if p.__class__.__name__ == 'YamlGenerator'][0]
-    ygen.prepare_pages_for_output(pgen, sgen)
+    ygen.prepare_pages_for_output()
 
