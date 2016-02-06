@@ -175,7 +175,7 @@ img.left, figure.left {float: left; margin: 0 2em 2em 0;}
 	}
 	
 	#banner h1 strong {font-size: 0.36em; font-weight: normal;}
-	
+
 	/* Main Nav */
 	#banner nav {
 		background: #000305;
@@ -186,37 +186,99 @@ img.left, figure.left {float: left; margin: 0 2em 2em 0;}
 		padding: 0;
 		text-align: center;
 		width: 800px;
-		
 		border-radius: 5px;
 		-moz-border-radius: 5px;
 		-webkit-border-radius: 5px;
 	}
 	
-	#banner nav ul {list-style: none; margin: 0 auto; width: 800px;}
-	#banner nav li {float: left; display: inline; margin: 0;}
-	
-	#banner nav a:link, #banner nav a:visited {
+	/* link appearance (m1, m2, m3) */
+	#banner nav > ul > li a {
 		color: #fff;
 		display: inline-block;
 		height: 30px;
-		padding: 5px 1.5em;
+		padding: 5px 0.5em;
 		text-decoration: none;
 	}
-	#banner nav a:hover, #banner nav a:active,
-	#banner nav .active a:link, #banner nav .active a:visited {
+	
+	/* top menus (m1 and m2) */
+	#banner nav > ul, 
+	#banner nav > ul > li > ul {
+		text-align: left;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	#banner nav > ul > li, 
+	#banner nav > ul > li > ul > li {
+		list-style-type: none;
+		float: left; 
+		display: inline-block;
+		padding: 0;
+		margin: 0;
+	}
+
+	/* top menu (m1) */
+	/* make the parent of sub-menu (m2) relative */
+	#banner nav > ul > li {
+		 position: relative;
+	}
+
+	/* top menu (m1) link appearance */
+	#banner nav > ul > li > a:hover,
+	#banner nav > ul > li > a:link, 
+	#banner nav > ul > li > a:visited {
 		background: #C74451;
 		color: #fff;
 		text-shadow: none !important;
 	}
-	
-	#banner nav li:first-child a {
+	#banner nav > ul > li > a:hover {
+		background: #000;
+	}
+	#banner nav > ul > li:first-child > a {
+		padding-left: 1.0em;
 		border-top-left-radius: 5px;
 		-moz-border-radius-topleft: 5px;
 		-webkit-border-top-left-radius: 5px;
-		
 		border-bottom-left-radius: 5px;
 		-moz-border-radius-bottomleft: 5px;
 		-webkit-border-bottom-left-radius: 5px;
+	}
+
+	/* sub-menu (m2) */
+	#banner nav > ul > li > ul {
+		display: none;
+		position: absolute;
+		top: 40px;  /* must match height of #banner nav */
+		left: 0;
+	}
+
+	/* show the m2 when hovering over top li */
+	#banner nav > ul > li:hover > ul {
+		display: block;
+	}
+
+	/* size of m2 boxes */
+	#banner nav > ul > li > ul > li > a {
+		background: green;
+		width: 250px;
+	}
+
+	#banner nav > ul > li > ul > li > a:hover {
+		background: #999;
+	}
+
+	/* 3rd level sub-menu (m3) */
+	#banner nav > ul > li > ul > li > ul {
+		display: none;
+		position: absolute;
+		top: 0px;
+		left: 115px;
+		width: 100px;
+	}
+
+	/* show the 3rd level when the second is hover */
+	#banner nav > ul > li > ul > li:hover > ul {
+		display: block;
 	}
 
 /*
