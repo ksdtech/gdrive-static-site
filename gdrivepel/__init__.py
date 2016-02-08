@@ -14,8 +14,19 @@ from sanitizer import (slugify, make_raw_filename, make_meta_filename,
 
 # List of atributes that users can put in Google Drive, Markdown, HTML, etc.
 USER_META_KEYS = [ 
-    'author', 'email', 'summary', 'template', 'title'
+    'author', 'email', 'summary', 'template', 'title', 'export_as'
 ]
+
+# Typical export_as formats
+GDRIVE_EXPORT_AS = {
+    'html': 'text/html',
+    'txt': 'text/plain',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'zip': 'application/zip',
+    'odt': 'application/vnd.oasis.opendocument.text',
+    'rtf': 'application/rtf',
+    'pdf': 'application/pdf'
+}
 
 class GDriveDownloader():
     def __init__(self, maxdepth=1000000, verbose=False):
@@ -34,12 +45,33 @@ class GDriveDownloader():
         self.gdrive = GoogleDrive(self.gauth)
         self.gauth.Authorize()
 
-    def getLocalTitle(self, item):
+    def getLocalTitle(self, item, metadata=None):
         local_title = None
         cleaned_title = None
         sort_priority = None
         sorted_title = None
         title = item['title'].strip()
+
+        file_type = None
+        if item['mimeType'] == 'application/vnd.google-apps.document':
+            if item['kind'] == 'drive#file' and 'exportLinks' in item:
+                file_type = 'text/html'
+
+                # Override html export
+                if metadata is not None and 'export_as' in metadata:
+                    export_as = metadata['export_as']
+                    file_type = GDRIVE_EXPORT_AS.get(export_as, None)
+                    if file_type is None:
+                        print('%s: export_as %s not in %r, using html' % (title, export_as, GDRIVE_EXPORT_AS.keys()))
+                        file_type = 'text/html'
+                    elif export_as == 'pdf' and title[-4:].lower() != '.pdf':
+                        title += '.pdf'
+
+                if file_type not in item['exportLinks']:
+                    print('%s: unable to export type %s' % (title, file_type))
+                    file_type = None
+        elif item['mimeType'] == 'text/plain' and title.endswith('.md'):
+            file_type = 'text/x-markdown'
 
         m = re.match(r'^(([0-9]{3})\]\s*)(.+)$', title)
         if m:
@@ -57,13 +89,6 @@ class GDriveDownloader():
             # Original file name, stripped of leading underscore or trailing extensions
             cleaned_title = re.sub(r'(^_|[_]*\.(pdf|yml|md|html)$)', '', title, flags=re.IGNORECASE)
             sorted_title = '999]' + cleaned_title
-
-        file_type = None
-        if item['mimeType'] == 'application/vnd.google-apps.document':
-            if item['kind'] == 'drive#file' and 'exportLinks' in item and 'text/html' in item['exportLinks']:
-                file_type = 'text/html'
-        elif item['mimeType'] == 'text/plain' and item['title'].endswith('.md'):
-            file_type = 'text/x-markdown'
 
         if self.verbose:
             print('localTitle for "%s" kind "%s" mime "%s" ' % (item['title'], item['kind'], item['mimeType']))
@@ -196,11 +221,12 @@ class GDriveDownloader():
                     new_folder = self.makeFolder(child, path_to)
                     self.recursiveDownloadInto(child['id'], new_folder)
                     self.depth -= 1
-                    print('Returned from "%s" (id: %s)' % (child['title'], child['id']))
-                    print('  back in folder %s at depth %d' % (path_to, self.depth))
+                    # print('Returned from "%s" (id: %s)' % (child['title'], child['id']))
+                    # print('  back in folder %s at depth %d' % (path_to, self.depth))
 
                 else:
-                    local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(child)
+                    gdrive_meta = self.parseGDriveMeta(child)
+                    local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(child, gdrive_meta)
 
                     meta_name = file_name = local_title
 
@@ -232,7 +258,7 @@ class GDriveDownloader():
                     try:
                         # Download the file
                         download_url = None
-                        if exported_type in ['text/html'] and 'exportLinks' in child and exported_type in child['exportLinks']:
+                        if 'exportLinks' in child and exported_type in child['exportLinks']:
                             download_url = child['exportLinks'][exported_type]
                         elif 'downloadUrl' in child:
                             download_url = child['downloadUrl']
@@ -248,7 +274,6 @@ class GDriveDownloader():
                             slug = slug[1:]
 
                         # Pull description from Google Drive
-                        gdrive_meta = self.parseGDriveMeta(child)
                         file_meta = {
                             'author': child['lastModifyingUserName'],
                             'basename': file_name,

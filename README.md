@@ -94,7 +94,7 @@ for more information. Example:
 3. Edit the theme you will use (we are testing with the "notmyidea" theme). 
 See Pelican docs for more information.
 
-4. Generate the site:
+4. Generate the site (see MULTISITE for alternative invocation):
 
         pelican pelican/sites -d -s pelican/pelicanconf.py -t pelican/themes/notmyidea 
 
@@ -159,10 +159,12 @@ The only allowed keys for metadata in the "Details" YAML section are:
 - author
 - email
 - summary
-- template
-- title
+- title - Specify an alternative title (overriding the Google Doc or Folder title)
+- menu_title - Specify an alternative title to be used in top level navigation menus.
+- export_as - Specify 'pdf' to override the standard 'html' export for a native Google Doc.
+- template - Specify 'section' to create a "section" for all the documents in this folder.
 
-These attributes must be specified in lower case
+These attributes must be specified in lower case.
 
 
 Sections and Folder Metadata
@@ -445,19 +447,23 @@ processed (recursively).
 --------------------
 The MIME type for a Google Doc is "application/vnd.google-apps.document".
 
-Google Docs are transformed to .html files in the content folder:
+Google Docs are transformed to .html or .pdf files in the content folder:
 
 1. The name ("title") of the Google Doc and any "description" on the Doc
 are extracted, a slug is built based on the title, and the description is
 saved in a "summary" metadata field. Assume that the title
 was "Technology Overview", then the slug would be "technology-overview".
 
-2. The file is downloaded to "\_raw\_technology-overview.html". ("\_raw\_" + slug + ".html")
+2. If metadata is supplied in the Google Drive "description" and the value for the "export_as" 
+key is "pdf", the document will be converted to a PDF and downloaded to "technology-overview.pdf"
+(slug + ".pdf").
 
-3. Then that file is post processed to pull out the "b" (bold) style and a few
+3. Otherwise (normal operation), the file is downloaded to "\_raw\_technology-overview.html". ("\_raw\_" + slug + ".html")
+
+4. The downloaded "raw" HTML file is post processed to pull out the "b" (bold) style and a few
 other sanitizing things.  The resultant file is named "technology-overview.html" (slug + ".html")
 
-4. A metadata file named "\_meta\_technology-overview.html.yaml" ("\_meta\_" + slug + "html.yml") 
+5. A metadata file named "\_meta\_technology-overview.html.yaml" ("\_meta\_" + slug + "html.yml") 
 is created with the sample content shown below. Note that the relative URL in the 
 metadata does not end in ".html": 
 

@@ -40,8 +40,8 @@ IGNORE_FILES = ['_*.*', '*.yml', '.#*']
 # Extract 'path_no_ext' value from path (removing extension)
 PATH_METADATA = '(?P<path_no_ext>.*)\..*'
 
-PAGE_SAVE_AS = '{path_no_ext}.html'
-PAGE_URL = '{path_no_ext}.html'
+PAGE_SAVE_AS = '{path_no_ext}'
+PAGE_URL = '{path_no_ext}'
 
 DOCMETA_SAVE_AS = '{path_no_ext}.yml'
 
