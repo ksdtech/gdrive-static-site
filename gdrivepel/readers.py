@@ -12,6 +12,7 @@ from markdown.inlinepatterns import Pattern
 from markdown.util import etree
 
 from pelican.readers import BaseReader, MarkdownReader
+from pelican.urlwrappers import Author
 from pelican.utils import pelican_open
 
 # logger for this file
@@ -91,7 +92,11 @@ class YamlReader(BaseReader):
         with pelican_open(source_path) as text:
             metadata = yaml.load(text)
 
-        # Turn these into Python date objects
+        # Turn these into expected objects
+        # 'author': pelican.urlwrappers.Author object
+        if 'author' in metadata:
+            metadata['author'] = Author(metadata['author'], self.settings)
+        # 'date' and 'modified': datetime.Date object (initially UTC)
         for key in ['date', 'modified']:
             if key in metadata:
                 metadata[key] = dateutil.parser.parse(metadata[key])
