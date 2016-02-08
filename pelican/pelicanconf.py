@@ -4,9 +4,11 @@ from __future__ import unicode_literals
 import os.path
 import sys
 
-
-
 AUTHOR = 'webmaster@kentfieldschools.org'
+
+# These are commented out because we're using MULTISITE.
+# See comments near bottom of this file.
+
 # SITENAME = 'Kentfield School District'
 # SITEURL = 'http://127.0.0.1:8088/ksd'
 
@@ -23,7 +25,7 @@ AUTHOR = 'webmaster@kentfieldschools.org'
 # PAGE_EXCLUDES = []
 
 # Where to get static files (PDFs, images, etc.)
-# STATIC_PATHS = PAGE_PATHS
+# STATIC_PATHS = [ 'district' ]
 
 # Directories to exclude from static file search
 # STATIC_EXCLUDES  = []
@@ -35,9 +37,13 @@ STATIC_EXCLUDE_SOURCES = True
 IGNORE_FILES = ['_*.*', '*.yml', '.#*']
 
 # Preserve pages file structure in output
-PATH_METADATA= '(?P<path_no_ext>.*)\..*'
-PAGE_SAVE_AS= '{path_no_ext}.html'
-PAGE_URL= '{path_no_ext}.html'
+# Extract 'path_no_ext' value from path (removing extension)
+PATH_METADATA = '(?P<path_no_ext>.*)\..*'
+
+PAGE_SAVE_AS = '{path_no_ext}.html'
+PAGE_URL = '{path_no_ext}.html'
+
+DOCMETA_SAVE_AS = '{path_no_ext}.yml'
 
 # Uncomment following line if you want document-relative URLs when developing
 # RELATIVE_URLS = True
@@ -70,10 +76,11 @@ SOCIAL = (('You can add links in your config file', '#'),
 DEFAULT_PAGINATION = 10
 LOAD_CONTENT_CACHE = False
 
-# Custom settings used by this project
+##########################################################################################
+# Custom settings used by the gdrive-static-site project
 
 # If set to True, YamlGenerator will build top-level navigation system
-AUTOMENU = False
+AUTOMENU = True
 
 # MULTISITE configuration (custom).
 # If present and not an empty list, this is a multi-site installation.
@@ -85,7 +92,7 @@ MULTISITE = {
     'SITEURL': 'http://127.0.0.1:8088/ksd/district',
     'PAGE_PATHS': [ 'pages' ],
     'STATIC_PATHS': [ 'pages' ],
-    'YAML_PATHS': [ '..' ],
+    'YAML_PATHS': [ 'pages' ],
     'OUTPUT_PATH': 'output/district',
   },
   'bacich': {
@@ -94,7 +101,7 @@ MULTISITE = {
     'SITEURL': 'http://127.0.0.1:8088/ksd/bacich',
     'PAGE_PATHS': [ 'pages' ],
     'STATIC_PATHS': [ 'pages' ],
-    'YAML_PATHS': [ '..' ],
+    'YAML_PATHS': [ 'pages' ],
     'OUTPUT_PATH': 'output/bacich'
   },
   'kent': {
@@ -103,10 +110,14 @@ MULTISITE = {
     'SITEURL': 'http://127.0.0.1:8088/ksd/kent',
     'PAGE_PATHS': [ 'pages' ],
     'STATIC_PATHS': [ 'pages' ],
-    'YAML_PATHS': [ '..' ],
+    'YAML_PATHS': [ 'pages' ],
     'OUTPUT_PATH': 'output/kent'
   }
 }
+
+##########################################################################################
+# Custom 'plugin' code for the gdrive-static-site project starts here.
+# All other plugin code is in the gdrivepel module.
 
 # If MULTISITE is set, you need to run the pelican executable once for 
 # each site with a PELICAN_PATh environment variable set to the site's key
@@ -124,9 +135,6 @@ if 'MULTISITE' in globals() and len(MULTISITE) > 0:
             globals()[name] = value
         print('MULTISITE for SUBSITE "%s"\n  PATH is "%s"\n  OUTPUT_PATH is "%s"' % (SUBSITE, PATH, OUTPUT_PATH))
 
-# Custom 'plugin' code for the gdrive-static-site project starts here.
-# All other plugin code is in the gdrivepel module.
-
 # Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -141,6 +149,6 @@ from gdrivepel.generators import YamlGenerator, on_get_generators, on_all_genera
 # File extensions that all generators will process.
 READERS = { 'md': MarkdownExtReader, 'html': HTMLReader }
 
-# Hook our generator logic in.
+# Hook our generator logic in
 signals.get_generators.connect(on_get_generators)
 signals.all_generators_finalized.connect(on_all_generators_finalized)
