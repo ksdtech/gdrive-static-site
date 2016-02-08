@@ -1,9 +1,11 @@
 from __future__ import print_function
 
+import codecs
 import logging
 import os.path
 import re
 import sys
+import yaml
 
 from pelican.contents import is_valid_content
 from pelican.generators import CachingGenerator, PagesGenerator
@@ -266,6 +268,9 @@ class YamlGenerator(CachingGenerator):
                 val = doc_meta.metadata.get(key, None)
                 if val is not None:
                     page.metadata[key] = val
+            doc_meta.metadata.update({
+                'content_class': page.__class__.__name__,
+                'content': location })
             logger.debug('Updated meta for page %s' % location)
         else:
             logger.debug('No DocMeta for for page %s' % location)
@@ -277,6 +282,29 @@ class YamlGenerator(CachingGenerator):
 
     def _href_for_location(self, location):
         return os.path.join(self.settings['SITEURL'], re.sub(r'^\/', '', location))
+
+    def _get_submenu_for_section(self, folder, section_meta):
+        submenu = [ ]
+        l = len(section_meta.metadata['subtopics'])
+        for t in section_meta.metadata['subtopics']:
+            item = { 'title': t['title'] }
+            item_type = 'link-local'
+            sub_location = t['sub_folder']
+            sub_folder, filename = os.path.split(sub_location)
+            navmenu_file = os.path.join(sub_folder, '_navmenu_.yml')
+            if navmenu_file in self.by_classes['NavMenu']:
+                item_type = 'include'
+            elif sub_location in self.by_classes['DocMeta']:
+                section_meta = self.by_classes['DocMeta'][sub_location]
+                subsub = self._get_submenu_for_section(sub_folder, section_meta)
+                if len(subsub) > 0:
+                    item_type = 'section'
+                    item['submenu'] = subsub
+            if item_type != 'include':
+                item['href'] = t['location']
+            item['type'] = item_type
+            submenu.append(item)
+        return submenu
 
     def _build_section_links(self, folder, section_meta):
         doc_links = [ ]
@@ -305,21 +333,33 @@ class YamlGenerator(CachingGenerator):
 
         section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
+            location = self._href_for_location(link[2])
             section_meta.metadata['contents'].append({ 
+                'sorted_title': link[0],
                 'title': link[1], 
-                'location': self._href_for_location(link[2]) })
+                'location': location })
 
         section_meta.metadata['subtopics'] = [ ]
         for link in sorted(subfolder_links, key=lambda x: x[0]):
+            location = self._href_for_location(link[2])
+            sub_location = os.path.join(link[2], '_folder_.yml')
             section_meta.metadata['subtopics'].append({ 
+                'sorted_title': link[0],
                 'title': link[1], 
-                'location': self._href_for_location(link[2]) })
+                'location': location,
+                'sub_folder': sub_location })
+
+        submenu = self._get_submenu_for_section(folder, section_meta)
+        section_meta.metadata['navmenu'] = submenu
 
     def _build_sections(self):
-        for location, doc_meta in self.by_classes['DocMeta'].iteritems():
+        # Build deepest sections first, because they may be included by shorter ones
+        section_paths = sorted(self.by_classes['DocMeta'].keys(), key=lambda path: -len(path))
+        for location in section_paths:
             dirname, fname = os.path.split(location)
             if fname == '_folder_.yml':
-                self._build_section_links(dirname, doc_meta)
+                section_meta = self.by_classes['DocMeta'][location]
+                self._build_section_links(dirname, section_meta)
 
     def _set_sections_for_pages(self):
         """
@@ -395,7 +435,35 @@ class YamlGenerator(CachingGenerator):
             link = self._href_for_location(link)
         return (name, link, submenu)
 
+    def _build_automenu(self):
+        top = None
+
+        # Get shortest paths first
+        file_paths = sorted(self.by_classes['DocMeta'].keys(), key=lambda path: len(path))
+        for location in file_paths:
+            loc_parts = location.split(os.sep)
+            depth = len(loc_parts) - 2
+            if depth == 0 and loc_parts[0] == 'pages' and loc_parts[-1] == '_folder_.yml':
+                folder_meta = self.by_classes['DocMeta'][location]
+                navmenu = folder_meta.metadata['navmenu']
+                if len(navmenu) > 0:
+                    dirname, filename = os.path.split(location)
+                    navmenu_file = os.path.abspath(os.path.join(self.path, 'pages', '_navmenu_auto_.yml'))
+                    yaml_meta = yaml.safe_dump(navmenu, default_flow_style=False,  explicit_start=True)
+                    with codecs.open(navmenu_file, 'w+', 'utf-8') as f:
+                        f.write(yaml_meta)
+                    self.navmenus[dirname] = [ ]
+                    for item in navmenu:
+                        name, link, submenu = self._resolve_navmenu_item(item, dirname)
+                        self.navmenus[dirname].append((name, link, submenu))
+                    top = dirname
+                break
+
+        return top
+
     def _build_navmenus(self):
+        top = None
+
         # Build deepest navmenus first, because they may be included by shorter ones
         navmenu_paths = sorted(self.by_classes['NavMenu'].keys(), key=lambda path: -len(path))
         for location in navmenu_paths:
@@ -406,23 +474,14 @@ class YamlGenerator(CachingGenerator):
             for item in navmenu:
                 name, link, submenu = self._resolve_navmenu_item(item, dirname)
                 self.navmenus[dirname].append((name, link, submenu))
+            top = dirname
 
-    def _get_navmenu_for_page(self, location):
-        dirname, filename = os.path.split(location)
-        for folder in self.navmenus:
-            l = len(folder)
-            if dirname[:l] == folder:
-                return self.navmenus[folder]
-        return None
+        if self.settings.get('AUTOMENU', False):
+            top = self._build_automenu()
 
-    def _set_navmenu_for_pages(self):
-        for location in self.by_classes['Page'].iterkeys():
-            page = self.by_classes['Page'][location]
-            navmenu = self._get_navmenu_for_page(location)
-            if navmenu is not None:
-                page.navmenu = navmenu
-            else:
-                page.navmenu = []
+        if top is not None:
+            return self.navmenus[top]
+        return [ ]
 
     def prepare_pages_for_output(self):
         """
@@ -440,9 +499,10 @@ class YamlGenerator(CachingGenerator):
         self._add_yaml_meta_to_pages()
         self._build_sections()
         self._set_sections_for_pages()
-        self._build_navmenus()
-        self._set_navmenu_for_pages()
 
+        menuitems = self._build_navmenus()
+        logger.debug('YamlGenerator menuitems %r' % menuitems)
+        self.context.update( { 'MENUITEMS': menuitems } ) 
 
 def on_get_generators(pelican):
     """

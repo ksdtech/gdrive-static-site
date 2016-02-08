@@ -20,11 +20,11 @@
 {% include 'github.html' %}
 <header id="banner" class="body">
     <h1><a href="{{ SITEURL }}/">{{ SITENAME }} {% if SITESUBTITLE %} <strong>{{ SITESUBTITLE }}</strong>{% endif %}</a></h1>
-    {% if page %}
+    {% if MENUITEMS %}
     <nav>
         <ul>
         {% set m1 = 0 %}
-        {% for l1name, l1link, l2menu in page.navmenu %}
+        {% for l1name, l1link, l2menu in MENUITEMS %}
             {% set m1 = m1 + 1 %}
             <li class="m1" id="mi_{{ m1 }}"><a href="{{ l1link }}">{{ l1name }}</a>
             {% if l2menu %}
@@ -51,7 +51,7 @@
         </ul>
     </nav>
     {% else %}
-    <!-- no page.navmenu -->
+    <!-- no MENUITEMS -->
     {% endif %}
 </header><!-- /#banner -->
         {% block content %}
