@@ -14,6 +14,11 @@
         <!--[if IE]>
             <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
         <![endif]-->
+
+        <link href="{{ SITEURL }}/{{ THEME_STATIC_DIR }}/css/sm-core-css.css" rel="stylesheet" type="text/css" />
+        <link href="{{ SITEURL }}/{{ THEME_STATIC_DIR }}/css/sm-nmi/sm-nmi.css" rel="stylesheet" type="text/css" />
+        <script src="{{ SITEURL }}/{{ THEME_STATIC_DIR }}/js/jquery-2.2.0.min.js"></script>
+        <script src="{{ SITEURL }}/{{ THEME_STATIC_DIR }}/js/jquery.smartmenus.min.js"></script>
 </head>
 
 <body id="index" class="home">
@@ -22,23 +27,23 @@
     <h1><a href="{{ SITEURL }}/">{{ SITENAME }} {% if SITESUBTITLE %} <strong>{{ SITESUBTITLE }}</strong>{% endif %}</a></h1>
     {% if MENUITEMS %}
     <nav>
-        <ul>
+        <ul id="main-menu" class="sm sm-nmi">
         {% set m1 = 0 %}
         {% for l1name, l1link, l2menu in MENUITEMS %}
             {% set m1 = m1 + 1 %}
-            <li class="m1" id="mi_{{ m1 }}"><a href="{{ l1link }}">{{ l1name }}</a>
+            <li class="m1"><a href="{{ l1link }}">{{ l1name }}</a>
             {% if l2menu %}
                 <ul>
                 {% set m2 = 0 %}
                 {% for l2name, l2link, l3menu in l2menu %}
                     {% set m2 = m2 + 1 %}
-                    <li class="m2" id="mi_{{ m1 }}_{{ m2 }}"><a href="{{ l2link }}">{{ l2name }}</a>
+                    <li class="m2"><a href="{{ l2link }}">{{ l2name }}</a>
                     {% if l3menu %}
                         <ul>
                         {% set m3 = 0 %}
                         {% for l3name, l3link, l4menu in l3menu %}
                             {% set m3 = m3 + 1 %}
-                            <li class="m3" id="mi_{{ m1 }}_{{ m2 }}_{{ m3 }}"><a href="{{ l3link }}">{{ l3name }}</a></li>
+                            <li class="m3"><a href="{{ l3link }}">{{ l3name }}</a></li>
                         {% endfor %}
                         </ul>
                     {% endif %}
@@ -96,5 +101,10 @@
 
 {% include 'analytics.html' %}
 {% include 'disqus_script.html' %}
+<script>
+$(function() {
+  $('#main-menu').smartmenus( { 'noMouseOver': true, 'showOnClick': true } );
+});
+</script>
 </body>
 </html>
