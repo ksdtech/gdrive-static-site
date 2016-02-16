@@ -1,3 +1,4 @@
+from __future__ import print_function
 
 import fnmatch
 import logging
@@ -101,3 +102,14 @@ class YamlReader(BaseReader):
             if key in metadata:
                 metadata[key] = dateutil.parser.parse(metadata[key])
         return content, metadata
+
+def on_readers_init(readers):
+    """
+    Called when the Readers instance has parsed the READERS settings.
+    Associate all Markdown file extensions with the MarkdownExtReader.  
+    Note: we don't install the YamlReader globally, it gets temporarily
+    patched in during YamlGenerator's generate_context process (Yaml files
+    are meant to be ignored by other generators).
+    """
+    for fmt in MarkdownExtReader.file_extensions:
+        readers.reader_classes[fmt] = MarkdownExtReader

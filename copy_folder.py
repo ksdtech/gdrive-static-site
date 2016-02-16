@@ -6,7 +6,7 @@ import sys
 # Find patched bleach module
 sys.path.append(os.path.join(os.path.dirname(__file__), '../bleach'))
 
-from gdrivepel import GDriveDownloader
+from gdrivepel.downloader import GDriveDownloader
 
 if __name__ == '__main__':
 

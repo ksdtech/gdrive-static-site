@@ -146,7 +146,7 @@ class IllformedSectionError(Exception):
 }
 """
 
-YAML_GENERATOR_IGNORE_FILES = ['_raw_*.*', '.#*']
+YAML_GENERATOR_IGNORE_FILES = [ '_raw_*.*', '.#*', '.DS_Store' ]
 YAML_METADATA_KEYS = [ 'author', 'basename_raw', 'date',
     'email', 'exported_type', 'modified', 'relative_url',
     'slug', 'source_id', 'source_type', 'summary', 'template',
@@ -274,7 +274,6 @@ class YamlGenerator(CachingGenerator):
             logger.debug('Updated meta for page %s' % location)
         else:
             logger.debug('No DocMeta for for page %s' % location)
-            page.metadata['title'] = fname
 
     def _add_yaml_meta_to_pages(self):
         for location, page in self.by_classes['Doc'].iteritems():

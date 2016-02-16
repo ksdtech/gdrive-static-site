@@ -34,7 +34,7 @@ AUTHOR = 'webmaster@kentfieldschools.org'
 STATIC_EXCLUDE_SOURCES = True
 
 # GLobal INGORE_FILES setting - overriden in YamlGenerator
-IGNORE_FILES = ['_*.*', '*.yml', '.#*']
+IGNORE_FILES = [ '_*.*', '*.yml', '.#*', '.DS_Store' ]
 
 # Preserve pages file structure in output
 # Extract 'path_no_ext' value from path (removing extension)
@@ -115,6 +115,19 @@ MULTISITE = {
   }
 }
 
+# Find gdrivepel module
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Find patched bleach module
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
+
+import gdrivepel
+PLUGINS = [ gdrivepel ]
+
+# File extensions that all generators will process.
+# Overriden in gdrivepel plugin, so no need to specify here.
+# READERS = { 'md': gdrivepel.MarkdownExtReader, 'html': HTMLReader }
+
 ##########################################################################################
 # Custom 'plugin' code for the gdrive-static-site project starts here.
 # All other plugin code is in the gdrivepel module.
@@ -134,21 +147,3 @@ if 'MULTISITE' in globals() and len(MULTISITE) > 0:
         for name, value in MULTISITE[SUBSITE].iteritems():
             globals()[name] = value
         print('MULTISITE for SUBSITE "%s"\n  PATH is "%s"\n  OUTPUT_PATH is "%s"' % (SUBSITE, PATH, OUTPUT_PATH))
-
-# Find gdrivepel module
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-# Find patched bleach module
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
-
-from pelican import signals
-from pelican.readers import HTMLReader
-from gdrivepel.readers import MarkdownExtReader
-from gdrivepel.generators import YamlGenerator, on_get_generators, on_all_generators_finalized
-
-# File extensions that all generators will process.
-READERS = { 'md': MarkdownExtReader, 'html': HTMLReader }
-
-# Hook our generator logic in
-signals.get_generators.connect(on_get_generators)
-signals.all_generators_finalized.connect(on_all_generators_finalized)
