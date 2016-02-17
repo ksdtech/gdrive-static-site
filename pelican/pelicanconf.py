@@ -40,10 +40,12 @@ IGNORE_FILES = [ '_*.*', '*.yml', '.#*', '.DS_Store' ]
 # Extract 'path_no_ext' value from path (removing extension)
 PATH_METADATA = '(?P<path_no_ext>.*)\..*'
 
-PAGE_SAVE_AS = '{path_no_ext}'
-PAGE_URL = '{path_no_ext}'
+# Pages in folders are not categorized
+USE_FOLDER_AS_CATEGORY = False
 
-DOCMETA_SAVE_AS = '{path_no_ext}.yml'
+# Use path_no_ext parsed from PATH_METADATA setting
+PAGE_SAVE_AS = '{path_no_ext}.html'
+PAGE_URL = '{path_no_ext}'
 
 # Uncomment following line if you want document-relative URLs when developing
 # RELATIVE_URLS = True
@@ -78,6 +80,10 @@ LOAD_CONTENT_CACHE = False
 
 ##########################################################################################
 # Custom settings used by the gdrive-static-site project
+
+# DocMeta content
+# Use path_no_ext parsed from PATH_METADATA setting
+DOCMETA_SAVE_AS = '{path_no_ext}.yml'
 
 # If set to True, YamlGenerator will build top-level navigation system
 AUTOMENU = True

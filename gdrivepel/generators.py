@@ -9,6 +9,7 @@ import yaml
 
 from pelican.contents import is_valid_content
 from pelican.generators import CachingGenerator, PagesGenerator
+from pelican.readers import parse_path_metadata
 
 from gdrivepel.contents import Page, DocMeta, NavMenu
 from gdrivepel.readers import YamlReader
@@ -169,6 +170,7 @@ class YamlGenerator(CachingGenerator):
         self.docid_map = { }
         self.by_classes = { }
         self.navmenus = { }
+        self.index_pages = [ ]
 
     def _patch_readers(self):
         """Remove existing readers and rebuild just with YamlReader."""
@@ -197,9 +199,10 @@ class YamlGenerator(CachingGenerator):
         """
         super(YamlGenerator, self).add_source_path(content)
 
-        if not content.source_id in self.docid_map:
-            self.docid_map[content.source_id] = [ ]
-        self.docid_map[content.source_id].append(content)
+        if hasattr(content, 'source_id'):
+            if not content.source_id in self.docid_map:
+                self.docid_map[content.source_id] = [ ]
+            self.docid_map[content.source_id].append(content)
 
     def generate_context(self):
         # Only use YamlReader, don't ingore anything, but only read files with yml extension.
@@ -310,25 +313,28 @@ class YamlGenerator(CachingGenerator):
         for location, doc in self.by_classes['Doc'].iteritems():
             dirname, fname = os.path.split(location)
             if dirname == folder:
+                title = None
                 if 'title' in doc.metadata:
                     title = doc.metadata['title']
-                    doc_links.append(
-                        (doc.metadata.get('sorted_title', title), title, doc.url))
                 else:
-                    raise IllformedSectionError('No title for doc %s at %s' % (doc.__class__.__name__, location))
+                    logger.warn('No title for %s %s in %s' % (doc.__class__.__name__, fname, dirname))
+                    title = fname
+                doc_links.append(
+                    (doc.metadata.get('sorted_title', title), title, doc.url, doc.__class__.__name__))
 
         subfolder_links = [ ]
         for location, doc_meta in self.by_classes['DocMeta'].iteritems():
             dirname, fname = os.path.split(location)
-            if fname == '_folder_.yml':
-                parent = os.path.dirname(dirname)
-                if parent == folder:
-                    if 'title' in doc_meta.metadata:
-                        title = doc_meta.metadata['title']
-                        subfolder_links.append(
-                            (doc_meta.metadata.get('sorted_title', title), title, dirname))
-                    else:
-                        raise IllformedSectionError('No title for subfolder %s at %s' % (doc_meta.__class__.__name__, location))
+            parent = os.path.dirname(dirname)
+            if fname == '_folder_.yml' and parent == folder:
+                title = None
+                if 'title' in doc_meta.metadata:
+                    title = doc_meta.metadata['title']
+                else:
+                    logger.warn('No title for subfolder %s in %s' % (dirname, parent))
+                    title = fname
+                subfolder_links.append(
+                    (doc_meta.metadata.get('sorted_title', title), title, dirname, 'DocMeta'))
 
         section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
@@ -336,7 +342,8 @@ class YamlGenerator(CachingGenerator):
             section_meta.metadata['contents'].append({ 
                 'sorted_title': link[0],
                 'title': link[1], 
-                'location': location })
+                'location': location,
+                'class': link[3] })
 
         section_meta.metadata['subtopics'] = [ ]
         for link in sorted(subfolder_links, key=lambda x: x[0]):
@@ -346,8 +353,60 @@ class YamlGenerator(CachingGenerator):
                 'sorted_title': link[0],
                 'title': link[1], 
                 'location': location,
-                'sub_folder': sub_location })
+                'sub_folder': sub_location,
+                'class': link[3] })
 
+    def _create_section_index(self, folder, section_meta):
+        page = None
+        any_subtopics = len(section_meta.metadata['subtopics']) > 0
+        first_doc = None
+        for doc in section_meta.metadata['contents']:
+            if doc['class'] == 'Page':
+                first_doc = doc
+                break
+
+        content = None
+        metadata = None
+        if first_doc is not None:
+            # Build an alias to the first document in the section
+            # Use 'alias' template to generate the redirect in the
+            # <head> element.
+            metadata = {
+                'template': 'alias',
+                'slug': section_meta.metadata['slug'],
+                'title': first_doc['title'],
+                'redirect_url': first_doc['location']
+            }
+
+        elif any_subtopics:
+            # Build an index page that just displays the submenus.
+            content = '<p>Click on the links in the Contents area.<p>'
+            metadata = {
+                'template': 'section',
+                'slug': section_meta.metadata['slug'],
+                'title': section_meta.metadata['title']
+            }
+
+        else:
+            # Build an index page at this location
+            content = '<p>This section has no content.<p>'
+            metadata = {
+                'template': 'section',
+                'slug': section_meta.metadata['slug'],
+                'title': section_meta.metadata['title']
+            }
+
+        if metadata is not None:
+            path = os.path.join(folder, 'index.html')
+            metadata.update(parse_path_metadata(path, settings=self.settings))
+            page = Page(content=content, metadata=metadata,
+                             settings=self.settings, source_path=path,
+                             context=self.context)
+            self.add_source_path(page)
+            self.index_pages.append(page)
+
+
+    def _build_section_navmenu(self, folder, section_meta):
         submenu = self._get_submenu_for_section(folder, section_meta)
         section_meta.metadata['navmenu'] = submenu
 
@@ -358,7 +417,15 @@ class YamlGenerator(CachingGenerator):
             dirname, fname = os.path.split(location)
             if fname == '_folder_.yml':
                 section_meta = self.by_classes['DocMeta'][location]
+
+                # Capture ordered links to contents and subtopics
                 self._build_section_links(dirname, section_meta)
+
+                # Depends on having subsection navmenus completed first
+                self._build_section_navmenu(dirname, section_meta)
+
+                # Must be done AFTER _build_section_links
+                self._create_section_index(dirname, section_meta)
 
     def _set_sections_for_pages(self):
         """
@@ -501,7 +568,15 @@ class YamlGenerator(CachingGenerator):
 
         menuitems = self._build_navmenus()
         logger.debug('YamlGenerator menuitems %r' % menuitems)
-        self.context.update( { 'MENUITEMS': menuitems } ) 
+        self.context.update( { 'MENUITEMS': menuitems } )
+
+    def generate_output(self, writer):
+        for page in self.index_pages:
+            writer.write_file(
+                page.save_as, self.get_template(page.template),
+                self.context, page=page,
+                relative_urls=self.settings['RELATIVE_URLS'],
+                override_output=hasattr(page, 'override_save_as'))
 
 def on_get_generators(pelican):
     """
