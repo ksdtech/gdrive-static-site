@@ -40,9 +40,13 @@ class IncludeHtmlPattern(Pattern):
         if include_fname[:1] != '_':
             include_fname = '_' + include_fname
         include_path = os.path.join(self._reader_dir, include_fname)
+        el = None
         with pelican_open(include_path) as text:
-            el = etree.fromstring(text)
-            return el
+            try:
+                el = etree.fromstring(text)
+            except Exception as e:
+                logger.error('Cannot parse included html %s: %s' % (include_path, e))
+        return el
 
 
 class MarkdownExtReader(MarkdownReader):

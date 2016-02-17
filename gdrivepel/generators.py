@@ -147,7 +147,7 @@ class IllformedSectionError(Exception):
 }
 """
 
-YAML_GENERATOR_IGNORE_FILES = [ '_raw_*.*', '.#*', '.DS_Store' ]
+YAML_GENERATOR_IGNORE_FILES = [ '_raw_*.*', '.#*', '_navmenu_auto_.yml', '.DS_Store' ]
 YAML_METADATA_KEYS = [ 'author', 'basename_raw', 'date',
     'email', 'exported_type', 'modified', 'relative_url',
     'slug', 'source_id', 'source_type', 'summary', 'template',
