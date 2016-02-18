@@ -356,7 +356,7 @@ class YamlGenerator(CachingGenerator):
 
         section_meta.metadata['contents'] = [ ]
         for link in sorted(doc_links, key=lambda x: x[0]):
-            location = self._href_for_location(link[2])
+            location = link[2] # self._href_for_location(link[2])
             section_meta.metadata['contents'].append({ 
                 'sorted_title': link[0],
                 'title': link[1], 
@@ -365,7 +365,7 @@ class YamlGenerator(CachingGenerator):
 
         section_meta.metadata['subtopics'] = [ ]
         for link in sorted(subfolder_links, key=lambda x: x[0]):
-            location = self._href_for_location(link[2])
+            location = link[2] # self._href_for_location(link[2])
             sub_location = os.path.join(link[2], '_folder_.yml')
             section_meta.metadata['subtopics'].append({ 
                 'sorted_title': link[0],
@@ -514,7 +514,7 @@ class YamlGenerator(CachingGenerator):
                 raise IllformedNavmenuError('link supplied for %s type' % item_type) 
 
         if link is None:
-            link = '/404.html?context=navmenu&slug=%s&dir=%s' % (slug, dirname)
+            link = '404.html?context=navmenu&slug=%s&dir=%s' % (slug, dirname)
         if not re.match(r'(http[s]?|ftp|mailto)\:', link):
             link = self._href_for_location(link)
         return (name, link, submenu)
@@ -533,7 +533,8 @@ class YamlGenerator(CachingGenerator):
                 if len(navmenu) > 0:
                     dirname, filename = os.path.split(location)
                     navmenu_file = os.path.abspath(os.path.join(self.path, 'pages', '_navmenu_auto_.yml'))
-                    yaml_meta = yaml.safe_dump(navmenu, default_flow_style=False,  explicit_start=True)
+                    navmenu_dict = { 'navmenu': navmenu }
+                    yaml_meta = yaml.safe_dump(navmenu_dict, default_flow_style=False,  explicit_start=True)
                     with codecs.open(navmenu_file, 'w+', 'utf-8') as f:
                         f.write(yaml_meta)
                     self.navmenus[dirname] = [ ]

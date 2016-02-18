@@ -86,7 +86,7 @@ LOAD_CONTENT_CACHE = False
 DOCMETA_SAVE_AS = '{path_no_ext}.yml'
 
 # If set to True, YamlGenerator will build top-level navigation system
-AUTOMENU = False
+AUTOMENU = True
 
 # MULTISITE configuration (custom).
 # If present and not an empty list, this is a multi-site installation.
