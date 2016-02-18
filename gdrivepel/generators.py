@@ -154,6 +154,24 @@ YAML_METADATA_KEYS = [ 'author', 'basename_raw', 'date',
     'sorted_title', 'sort_priority', 'title', 'version' ]
 CONTENT_CLASSES = [ 'Doc', 'Page', 'Static', 'DocMeta', 'NavMenu' ]
 
+# Example of Google doc href
+# https://www.google.com/url
+#   ?q=https://docs.google.com/document/d/1mZdFHJor-GGUiJd08F3wZb6pD-Aal7E3_4dqOWoTxWA/edit?usp%3Dsharing
+#   &amp;sa=D&amp;ust=1455753241243000&amp;usg=AFQjCNF7OYw1X2o9Bkq4F8omptlyt8nPig
+
+# Regex based on the one used in contents.py from pelican version 3.6.3
+GDRIVE_LINK_RE = re.compile(
+    r"""
+    (?P<markup><\s*[^\>]*   # <a rel="nofollow" href=   --> markup
+        (?:href|src|poster|data|cite|formaction|action)\s*=)
+    (?P<quote>["\'])        # "                         --> quote
+    (?:https\:\/\/www.google.com\/url\?q=https\:\/\/docs.google.com\/document\/d\/)
+    (?P<docid>[-_a-zA-Z0-9]+) # Google doc id           --> docid
+    (?:\/.+)                # rest of URL
+    \2                      # "                         <-- quote
+    """, re.X)
+
+
 class YamlGenerator(CachingGenerator):
     """
     Process .yml files to merge metadata
@@ -273,7 +291,7 @@ class YamlGenerator(CachingGenerator):
                     page.metadata[key] = val
             doc_meta.metadata.update({
                 'content_class': page.__class__.__name__,
-                'content': location })
+                'content_location': location })
             logger.debug('Updated meta for page %s' % location)
         else:
             logger.debug('No DocMeta for for page %s' % location)
@@ -549,22 +567,54 @@ class YamlGenerator(CachingGenerator):
             return self.navmenus[top]
         return [ ]
 
+    def _find_closest_page_location_by_docid(self, location, docid):
+        doc_metas = self.docid_map.get(docid, [])
+        for doc_meta in doc_metas:
+            if doc_meta.metadata.get('content_class') == 'Page':
+                page_location = doc_meta.metadata.get('content_location')
+                if page_location is not None and page_location in self.context['filenames']:
+                    print('Page %s found for docid %s' % (page_location, docid))
+                    return page_location
+
+        print('No page found for docid %s' % docid)
+        return None
+
+    def _rewrite_gdrive_link_for_page(self, location, page):
+
+        def replacer(m):
+            docid = m.group('docid')
+            closest_location = self._find_closest_page_location_by_docid(location, docid)
+
+            if closest_location is not None:
+                url = self._href_for_location(closest_location)
+                return ''.join((m.group('markup'), m.group('quote'), url, m.group('quote')))
+            else:
+                # No substitution, just return original match
+                return m.group(0)
+
+        (content, subs_made) = GDRIVE_LINK_RE.subn(replacer, page._content)
+        if subs_made > 0:
+            print('%s: mapped %d substitutions' % (location, subs_made))
+            self.context['filenames'][location]._content = content
+        else:
+            print('%s: NO substitutions' % location)
+
+
+    def _rewrite_gdrive_links_for_pages(self):
+        for location, page in self.by_classes['Page'].iteritems():
+            self._rewrite_gdrive_link_for_page(location, page)
+
     def prepare_pages_for_output(self):
         """
         Add top-level navigation menu to all pages.
         Fix up templates and for pages in sections.
         Fix up links in pages that point to other Google Docs.
         """
-        logger.debug('YamlGenerator docid_map')
-        for docid, content_list in self.docid_map.iteritems():
-            logger.debug('docid %s:' % docid)
-            for content in content_list:
-                logger.debug('  %s/ %s' % (content.metadata['dirname'], content.metadata['basename']))
-
         self._categorize_filenames()
         self._add_yaml_meta_to_pages()
         self._build_sections()
         self._set_sections_for_pages()
+        self._rewrite_gdrive_links_for_pages()
 
         menuitems = self._build_navmenus()
         logger.debug('YamlGenerator menuitems %r' % menuitems)
