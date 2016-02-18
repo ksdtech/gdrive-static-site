@@ -297,8 +297,14 @@ class GDriveDownloader():
                         file_meta.update(gdrive_meta)
 
                         if source_type == 'text/yaml':
-                            source_meta = yaml.load(file_content)
-                            file_meta.update(source_meta)
+                            try:
+                                source_meta = yaml.load(file_content)
+                                if isinstance(source_meta, dict):
+                                    file_meta.update(source_meta)
+                                else:
+                                    raise Exception('YAML object %r is not a dict' % source_meta)
+                            except Exception as e:
+                                print('Error parsing YAML from %s: %s' % (download_url, e))
                         else:
                             self.writeContent(new_file, file_content)
                             meta_name = make_meta_filename(file_name)
