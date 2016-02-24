@@ -121,6 +121,11 @@ MULTISITE = {
   }
 }
 
+# API secrets
+# You must define SEARCHIFY_API_URL in the appconfig.py file
+sys.path.append(os.path.dirname(__file__))
+from appconfig import *
+
 # Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 

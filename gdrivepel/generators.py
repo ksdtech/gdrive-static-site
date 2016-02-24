@@ -574,10 +574,10 @@ class YamlGenerator(CachingGenerator):
             if doc_meta.metadata.get('content_class') == 'Page':
                 page_location = doc_meta.metadata.get('content_location')
                 if page_location is not None and page_location in self.context['filenames']:
-                    print('Page %s found for docid %s' % (page_location, docid))
+                    # print('Page %s found for docid %s' % (page_location, docid))
                     return page_location
 
-        print('No page found for docid %s' % docid)
+        # print('No page found for docid %s' % docid)
         return None
 
     def _rewrite_gdrive_link_for_page(self, location, page):
@@ -595,10 +595,11 @@ class YamlGenerator(CachingGenerator):
 
         (content, subs_made) = GDRIVE_LINK_RE.subn(replacer, page._content)
         if subs_made > 0:
-            print('%s: mapped %d substitutions' % (location, subs_made))
+            # print('%s: mapped %d substitutions' % (location, subs_made))
             self.context['filenames'][location]._content = content
         else:
-            print('%s: NO substitutions' % location)
+            # print('%s: NO substitutions' % location)
+            pass
 
 
     def _rewrite_gdrive_links_for_pages(self):
@@ -642,6 +643,5 @@ def on_all_generators_finalized(generators):
     Called when all generators have set up contexts.
     We will build the navigation menus and specify section templates for pages in sections.
     """
-    ygen = [p for p in generators if p.__class__.__name__ == 'YamlGenerator'][0]
+    ygen = next(p for p in generators if p.__class__.__name__ == 'YamlGenerator')
     ygen.prepare_pages_for_output()
-
