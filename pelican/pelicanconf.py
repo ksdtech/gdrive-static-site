@@ -75,6 +75,9 @@ LINKS = (('Pelican', 'http://getpelican.com/'),
 SOCIAL = (('You can add links in your config file', '#'),
           ('Another social link', '#'),)
 
+# Add our custom 'search' tempalate to Pelican's built-in ones
+DIRECT_TEMPLATES = ['index', 'tags', 'categories', 'authors', 'archives', 'search']
+
 DEFAULT_PAGINATION = 10
 LOAD_CONTENT_CACHE = False
 
@@ -100,6 +103,7 @@ MULTISITE = {
     'STATIC_PATHS': [ 'pages' ],
     'YAML_PATHS': [ 'pages' ],
     'OUTPUT_PATH': 'output/district',
+    'SEARCHIFY_INDEX': 'district'
   },
   'bacich': {
     'PATH': 'sites/bacich',
@@ -108,7 +112,8 @@ MULTISITE = {
     'PAGE_PATHS': [ 'pages' ],
     'STATIC_PATHS': [ 'pages' ],
     'YAML_PATHS': [ 'pages' ],
-    'OUTPUT_PATH': 'output/bacich'
+    'OUTPUT_PATH': 'output/bacich',
+    'SEARCHIFY_INDEX': 'bacich'
   },
   'kent': {
     'PATH': 'sites/kent',
@@ -117,12 +122,13 @@ MULTISITE = {
     'PAGE_PATHS': [ 'pages' ],
     'STATIC_PATHS': [ 'pages' ],
     'YAML_PATHS': [ 'pages' ],
-    'OUTPUT_PATH': 'output/kent'
+    'OUTPUT_PATH': 'output/kent',
+    'SEARCHIFY_INDEX': 'kent'
   }
 }
 
 # API secrets
-# You must define SEARCHIFY_API_URL in the appconfig.py file
+# You must define SEARCHIFY_API_URL and SEARCHIFY_PUBLIC_URL in the appconfig.py file
 sys.path.append(os.path.dirname(__file__))
 from appconfig import *
 

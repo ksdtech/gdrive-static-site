@@ -14,6 +14,7 @@ from pelican.readers import parse_path_metadata
 from gdrivepel.contents import Page, DocMeta, NavMenu
 from gdrivepel.readers import YamlReader
 from gdrivepel.sanitizer import slugify, make_meta_filename
+from gdrivepel.search import on_content
 
 # logger for this file
 logger = logging.getLogger(__name__)
@@ -295,6 +296,9 @@ class YamlGenerator(CachingGenerator):
             logger.debug('Updated meta for page %s' % location)
         else:
             logger.debug('No DocMeta for for page %s' % location)
+
+        # Time to add our search indexes, too
+        on_content(page)
 
     def _add_yaml_meta_to_pages(self):
         for location, page in self.by_classes['Doc'].iteritems():
@@ -613,10 +617,12 @@ class YamlGenerator(CachingGenerator):
         Fix up links in pages that point to other Google Docs.
         """
         self._categorize_filenames()
+
+        self._rewrite_gdrive_links_for_pages()
         self._add_yaml_meta_to_pages()
+        
         self._build_sections()
         self._set_sections_for_pages()
-        self._rewrite_gdrive_links_for_pages()
 
         menuitems = self._build_navmenus()
         logger.debug('YamlGenerator menuitems %r' % menuitems)

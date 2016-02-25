@@ -673,6 +673,9 @@ To be SEO friendly and avoid double content, redirect the .html urls:
 
 Full-Text Search
 ================
+Added the ability to use the (free up to 100,000 documents) Searchify service
+to build full-text indexes of all HTML and PDF files that are run through Pelican.
+
 pip install --upgrade --ignore-installed slate==0.3 pdfminer==20110515
 
 

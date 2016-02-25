@@ -20,32 +20,44 @@ class SearchIndexer:
     self.api = ApiClient(api_url)
     index = None
     try:
-      index = self.api.create_index(index_name)
-    except:
       index = self.api.get_index(index_name)
-      pass
+      logger.debug('Found searchify index %s' % index_name)
+    except:
+      public_search_enabled = True
+      logger.debug('Creating searchify index %s' % index_name)
+      index = self.api.create_index(index_name, public_search_enabled)
+      while not index.has_started():
+        time.sleep(0.5)
+      logger.debug('Searchify index %s started' % index_name)
     if index is None:
       logger.fatal('Could not create or get index %s' % index_name)
       sys.exit(1)
 
-    while not index.has_started():
-      time.sleep(0.5)
     self.index = index
+
 
   def _index_html(self, content, path):
     if content.content is None:
       logger.debug('skipping html index for %s - no content' % path)
       return
 
+    # Available metadata: 'author', 'basename_raw', 'date',
+    # 'email', 'exported_type', 'modified', 'relative_url',
+    # 'slug', 'source_id', 'source_type', 'summary', 'template',
+    # 'sorted_title', 'sort_priority', 'title', 'version' 
+    title = content.metadata['title']
+     # Works with UTC datetimes
+    timestamp = int(time.mktime(content.metadata['modified'].timetuple()))
+
     # Remove all script and style elements
     soup = BeautifulSoup(content.content)
     for script in soup(['script', 'style']):
-      script.extract()
-    page_text = soup.get_text()
+      script.extract()    
+    text = soup.get_text()
 
-    # TODO: 'title', 'author', 'timestamp'
     # TODO: variables = { 0: rating, 1: reputation, 2: visits }
-    self.index.add_document(path, { 'text': page_text })
+    self.index.add_document(path, { 
+      'text': text, 'title': title, 'timestamp' : timestamp })
 
   def _index_pdf(self, content, path):
     fpath = os.path.join(self.source_root, path)
@@ -53,15 +65,23 @@ class SearchIndexer:
       logger.error('Indexer: Cannot read pdf at %s' % fpath)
       return
 
+    # Available metadata: 'author', 'basename_raw', 'date',
+    # 'email', 'exported_type', 'modified', 'relative_url',
+    # 'slug', 'source_id', 'source_type', 'summary', 'template',
+    # 'sorted_title', 'sort_priority', 'title', 'version' 
+    title = content.metadata['title']
+    # Works with UTC datetimes
+    timestamp = int(time.mktime(content.metadata['modified'].timetuple()))
+
     with open(fpath) as f:
       doc = slate.PDF(f)
       i = 0
-      for page_text in doc:
+      for text in doc:
         i += 1
 
-        # TODO: 'title', 'author', 'timestamp'
         # TODO: variables = { 0: rating, 1: reputation, 2: visits }
-        self.index.add_document(path, { 'text': page_text })
+        self.index.add_document(path, { 
+          'text': text, 'title': title, 'timestamp' : timestamp })
 
   def index_content(self, content):
     content_type = content.__class__.__name__
@@ -86,7 +106,7 @@ class SearchIndexer:
 
 def get_indexer(settings):
   if get_indexer.indexer is None:
-    index_name = settings.get('SUBSITE', 'main')
+    index_name = settings.get('SEARCHIFY_INDEX', settings.get('SUBSITE', 'main'))
     source_root = os.path.abspath(settings['PATH'])
     if source_root[-1:] != '/':
       source_root += '/'
