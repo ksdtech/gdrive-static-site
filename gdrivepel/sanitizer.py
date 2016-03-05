@@ -5,6 +5,8 @@ import re
 import sys
 import yaml
 
+# Find patched bleach module
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
 from bleach import clean
 
 # mozilla/bleach and or html5lib tokenizer/sanitizer still have some bugs

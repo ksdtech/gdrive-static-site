@@ -6,8 +6,7 @@ from pprint import pprint as pp
 import re
 import yaml
 
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
+from drive_service import DriveServiceAuth
 
 from sanitizer import (slugify, make_raw_filename, make_meta_filename, 
     sanitize_html_file, prepend_markdown_metadata)
@@ -30,6 +29,12 @@ GDRIVE_EXPORT_AS = {
 
 class GDriveDownloader():
     def __init__(self, maxdepth=1000000, verbose=False):
+        secrets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'client_secrets.json')
+        credentials_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials.json')
+        print(secrets_path)
+        sys.exit(1)
+        self.drive_auth = DriveServiceAuth(secrets_path, credentials_path)
+        self.drive_service = None
         self.depth = 0
         self.root_path = None
         self.gauth = None
@@ -39,11 +44,8 @@ class GDriveDownloader():
         self.file_list = [ ]
         print('GDriveDownloader maxdepth %d, verbose %r' % (maxdepth, verbose))
 
-    def authorize(self):
-        self.gauth = GoogleAuth()
-        self.gauth.LocalWebserverAuth()
-        self.gdrive = GoogleDrive(self.gauth)
-        self.gauth.Authorize()
+    def initService(self):
+        self.drive_service = self.drive_auth.build_service()
 
     def getLocalTitle(self, item, metadata=None):
         local_title = None
@@ -187,10 +189,10 @@ class GDriveDownloader():
                 print('Maximum depth %d exceeded' % self.depth)
             return
 
-        if not self.gauth:
-            self.authorize()
+        if not self.drive_service:
+            self.initService()
 
-        item = self.gauth.service.files().get(fileId=fID_from).execute()
+        item = self.drive_service.files().get(fileId=fID_from).execute()
         if self.verbose:
             print('Recursively downloading "%s" (id: %s)' % (item['title'], item['id']))
             print('  into folder %s at depth %d' % (path_to, self.depth))

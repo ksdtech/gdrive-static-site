@@ -135,9 +135,6 @@ from appconfig import *
 # Find gdrivepel module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# Find patched bleach module
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../bleach'))
-
 import gdrivepel
 PLUGINS = [ gdrivepel ]
 
