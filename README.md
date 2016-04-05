@@ -25,7 +25,9 @@ https://github.com/Socialsquare/google-drive-migrator
 
 3. Create Web consent screen for the project.
 
-4. Create client secrets for the project.  Use redirect\_uris: "http://localhost:8080/" and javascript_origins: "http://localhost:8080".  Download the client secrets JSON file to client\_secrets.json file in top-level directory of this project.
+4. Create client credentials for the project. Use "Other" as the
+project type (to include the "urn:ietf:wg:oauth:2.0:oob" redirect URI). Download the client secrets
+JSON file to client\_secrets.json file in top-level directory of this project.
 
 5. Obtain the id of top level Google Drive folder to copy.
 

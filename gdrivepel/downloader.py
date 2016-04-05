@@ -143,15 +143,13 @@ class GDriveDownloader():
 
     def makeFolder(self, folder_item, path_to):
         local_title, cleaned_title, sorted_title, sort_priority, exported_type = self.getLocalTitle(folder_item)
-        cur_path = None
         new_path = None
         new_folder = None
         if path_to == '':
-            cur_path = '/'
+            path_to = '/'
             new_path = local_title
             new_folder = os.path.join(self.root_path, local_title)
         else:
-            cur_path = os.path.join('/', path_to)
             new_path = os.path.join(path_to, local_title)
             new_folder = os.path.join(self.root_path, new_path)
 
@@ -160,7 +158,7 @@ class GDriveDownloader():
             if not exists_check:
                 os.mkdir(new_folder)
                 if self.verbose:
-                    print('Created folder "%s" in "%s"' % (local_title, cur_path))
+                    print('Created folder "%s" in "%s"' % (local_title, path_to))
 
         # Pull description from Google Drive
         gdrive_meta = self.parseGDriveMeta(folder_item)
@@ -169,7 +167,7 @@ class GDriveDownloader():
             'basename': local_title,
             'basename_raw': local_title,
             'date': folder_item['createdDate'],
-            'dirname': cur_path,
+            'dirname': path_to,
             'email': folder_item['lastModifyingUser']['emailAddress'],
             'exported_type': exported_type,
             'relative_url': local_title,
@@ -193,37 +191,12 @@ class GDriveDownloader():
             self.writeMeta(meta_file, folder_meta)
         return new_path
 
-    def recursiveDownloadInto(self, fID_from, path_to):
-        if self.depth > self.maxdepth:
-            if self.verbose:
-                print('Maximum depth %d exceeded' % self.depth)
-            return
-
-        if not self.drive_service:
-            self.initService()
-
-        item = self.drive_service.files().get(fileId=fID_from).execute()
-        if self.verbose:
-            print('Recursively downloading "%s" (id: %s)' % (item['title'], item['id']))
-            print('  into folder %s at depth %d' % (path_to, self.depth))
-
-        if self.depth == 0:
-            if self.stats_only:
-                stats_fname = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stats.tsv')
-                self.stats_file = codecs.EncodedFile(open(stats_fname, 'w'), 'utf-8')
-                self.stats_file.write('\t'.join(STATS_META_FIELDS))
-                self.stats_file.write('\n')
-
-            if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
-                self.root_path = path_to
-                path_to = self.makeFolder(item, '')
-            else:
-                print('Top level item is not a folder')
-                return
-
+    def downloadFiles(self, fID_from, path_to, query_format):
         # Go through children with pagination
+        query =  query_format % fID_from
+        page_token = None
         while True:
-            result = self.drive_service.files().list(q='"%s" in parents and trashed = false' % fID_from).execute()
+            result = self.drive_service.files().list(pageToken=page_token, q=query).execute()
 
             # Alternative way to get children:
             #   (returns `drive#childReference` instead of `drive#file`)
@@ -347,6 +320,40 @@ class GDriveDownloader():
             page_token = result.get('nextPageToken')
             if not page_token:
                 break
+
+
+    def recursiveDownloadInto(self, fID_from, path_to):
+        if self.depth > self.maxdepth:
+            if self.verbose:
+                print('Maximum depth %d exceeded' % self.depth)
+            return
+
+        if not self.drive_service:
+            self.initService()
+
+        item = self.drive_service.files().get(fileId=fID_from).execute()
+        if self.verbose:
+            print('Recursively downloading "%s" (id: %s)' % (item['title'], item['id']))
+            print('  into folder %s at depth %d' % (path_to, self.depth))
+
+        if self.depth == 0:
+            if self.stats_only:
+                stats_fname = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stats.tsv')
+                self.stats_file = codecs.EncodedFile(open(stats_fname, 'w'), 'utf-8')
+                self.stats_file.write('\t'.join(STATS_META_FIELDS))
+                self.stats_file.write('\n')
+
+            if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
+                self.root_path = path_to
+                path_to = self.makeFolder(item, '')
+            else:
+                print('Top level item is not a folder')
+                return
+
+        # First get files in this folder
+        self.downloadFiles(fID_from, path_to, '"%s" in parents and trashed = false and mimeType != "application/vnd.google-apps.folder"')
+        # Then get subfolders in this folder
+        self.downloadFiles(fID_from, path_to, '"%s" in parents and trashed = false and mimeType = "application/vnd.google-apps.folder"')
 
     def readMeta(self, meta_file):
         metadata = { }
