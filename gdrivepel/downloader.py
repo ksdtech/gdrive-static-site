@@ -4,6 +4,7 @@ import codecs
 import os.path
 from pprint import pprint as pp
 import re
+import sys
 import yaml
 
 from drive_service import DriveServiceAuth
@@ -27,20 +28,20 @@ GDRIVE_EXPORT_AS = {
     'pdf': 'application/pdf'
 }
 
+STATS_META_FIELDS = [ 'title', 'basename', 'dirname', 'exported_type', 'source_id', 'source_type', 'exported_type' ]
+
 class GDriveDownloader():
-    def __init__(self, maxdepth=1000000, verbose=False):
+    def __init__(self, maxdepth=1000000, verbose=False, stats_only=False):
         secrets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'client_secrets.json')
         credentials_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials.json')
-        print(secrets_path)
-        sys.exit(1)
         self.drive_auth = DriveServiceAuth(secrets_path, credentials_path)
         self.drive_service = None
         self.depth = 0
         self.root_path = None
-        self.gauth = None
-        self.gdrive = None
         self.maxdepth = maxdepth
         self.verbose = verbose
+        self.stats_only = stats_only
+        self.stats_file = None
         self.file_list = [ ]
         print('GDriveDownloader maxdepth %d, verbose %r' % (maxdepth, verbose))
 
@@ -124,10 +125,15 @@ class GDriveDownloader():
                 gdrive_meta[key] = raw_meta[key]
         return gdrive_meta
 
+    def appendStats(self, item_type, item_meta):
+        item_vals = [codecs.encode(item_meta.get(f) or '', 'utf-8') for f in STATS_META_FIELDS]
+        self.stats_file.write('\t'.join(item_vals))
+        self.stats_file.write('\n')
+
     def getDownloadContent(self, download_url):
         content = None
         if download_url:
-            resp, content = self.gauth.service._http.request(download_url)
+            resp, content = self.drive_service._http.request(download_url)
             if resp.status != 200:
                 raise RuntimeError('An error occurred: %s' % resp)
         else:
@@ -148,12 +154,13 @@ class GDriveDownloader():
             cur_path = os.path.join('/', path_to)
             new_path = os.path.join(path_to, local_title)
             new_folder = os.path.join(self.root_path, new_path)
-        exists_check = os.path.exists(new_folder)
 
-        if not exists_check:
-            os.mkdir(new_folder)
-            if self.verbose:
-                print('Created folder "%s" in "%s"' % (local_title, cur_path))
+        if not self.stats_only:
+            exists_check = os.path.exists(new_folder)
+            if not exists_check:
+                os.mkdir(new_folder)
+                if self.verbose:
+                    print('Created folder "%s" in "%s"' % (local_title, cur_path))
 
         # Pull description from Google Drive
         gdrive_meta = self.parseGDriveMeta(folder_item)
@@ -179,8 +186,11 @@ class GDriveDownloader():
         }
         folder_meta.update(gdrive_meta)
 
-        meta_file = os.path.join(new_folder, '_folder_.yml')
-        self.writeMeta(meta_file, folder_meta)
+        if self.stats_only:
+            self.appendStats('folder', folder_meta)
+        else:
+            meta_file = os.path.join(new_folder, '_folder_.yml')
+            self.writeMeta(meta_file, folder_meta)
         return new_path
 
     def recursiveDownloadInto(self, fID_from, path_to):
@@ -198,6 +208,12 @@ class GDriveDownloader():
             print('  into folder %s at depth %d' % (path_to, self.depth))
 
         if self.depth == 0:
+            if self.stats_only:
+                stats_fname = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stats.tsv')
+                self.stats_file = codecs.EncodedFile(open(stats_fname, 'w'), 'utf-8')
+                self.stats_file.write('\t'.join(STATS_META_FIELDS))
+                self.stats_file.write('\n')
+
             if item['kind'] == 'drive#file' and item['mimeType'] == 'application/vnd.google-apps.folder':
                 self.root_path = path_to
                 path_to = self.makeFolder(item, '')
@@ -207,11 +223,11 @@ class GDriveDownloader():
 
         # Go through children with pagination
         while True:
-            result = self.gauth.service.files().list(q='"%s" in parents and trashed = false' % fID_from).execute()
+            result = self.drive_service.files().list(q='"%s" in parents and trashed = false' % fID_from).execute()
 
             # Alternative way to get children:
             #   (returns `drive#childReference` instead of `drive#file`)
-            # result = self.gauth.service.children().list(folderId=fID_from).execute()
+            # result = self.drive_service.children().list(folderId=fID_from).execute()
             for child in result['items']:
                 if child['kind'] != 'drive#file':
                     print('Unknown object type (not file or folder): "%s"' % child['kind'])
@@ -254,18 +270,9 @@ class GDriveDownloader():
                         raw_file_name = make_raw_filename(file_name)
 
                     new_file = os.path.join(self.root_path, path_to, raw_file_name)
-                    exists_check = os.path.exists(new_file)
                     if self.verbose:
                         print('Trying to download "%s"' % child['title'])
                     try:
-                        # Download the file
-                        download_url = None
-                        if 'exportLinks' in child and exported_type in child['exportLinks']:
-                            download_url = child['exportLinks'][exported_type]
-                        elif 'downloadUrl' in child:
-                            download_url = child['downloadUrl']
-                        file_content = self.getDownloadContent(download_url)
-
                         # Lower-case url, with .md converted to .html
                         relative_url = re.sub(r'\.md$', '.html', local_title, flags=re.IGNORECASE)
 
@@ -298,26 +305,39 @@ class GDriveDownloader():
                         }
                         file_meta.update(gdrive_meta)
 
-                        if source_type == 'text/yaml':
-                            try:
-                                source_meta = yaml.load(file_content)
-                                if isinstance(source_meta, dict):
-                                    file_meta.update(source_meta)
-                                else:
-                                    raise Exception('YAML object %r is not a dict' % source_meta)
-                            except Exception as e:
-                                print('Error parsing YAML from %s: %s' % (download_url, e))
-                        else:
-                            self.writeContent(new_file, file_content)
-                            meta_name = make_meta_filename(file_name)
+                        if not self.stats_only:
+                            # Download the file
+                            download_url = None
+                            if 'exportLinks' in child and exported_type in child['exportLinks']:
+                                download_url = child['exportLinks'][exported_type]
+                            elif 'downloadUrl' in child:
+                                download_url = child['downloadUrl']
+                            file_content = self.getDownloadContent(download_url)
 
-                        meta_file = os.path.join(self.root_path, path_to, meta_name)
-                        self.writeMeta(meta_file, file_meta)
+                            if source_type == 'text/yaml':
+                                try:
+                                    source_meta = yaml.load(file_content)
+                                    if isinstance(source_meta, dict):
+                                        file_meta.update(source_meta)
+                                    else:
+                                        raise Exception('YAML object %r is not a dict' % source_meta)
+                                except Exception as e:
+                                    print('Error parsing YAML from %s: %s' % (download_url, e))
+                            else:
+                                self.writeContent(new_file, file_content)
+                                meta_name = make_meta_filename(file_name)
 
-                        if self.verbose:
-                            print('Write to file "%s" exported as %s' % (new_file, exported_type))
+                            meta_file = os.path.join(self.root_path, path_to, meta_name)
+                            self.writeMeta(meta_file, file_meta)
+
+                            if self.verbose:
+                                print('Write to file "%s" exported as %s' % (new_file, exported_type))
+
                         if exported_type is not None:
-                            self.file_list.append((path_to, raw_file_name, file_name, meta_name, exported_type))
+                            if self.stats_only:
+                                self.appendStats('file', file_meta)
+                            else:
+                                self.file_list.append((path_to, raw_file_name, file_name, meta_name, exported_type))
 
                     except Exception as e:
                         print('  Failed: %s\n' % e)
@@ -345,7 +365,10 @@ class GDriveDownloader():
         with open(content_file, 'w+') as f:
             f.write(content)
 
-    def postProcess(self):
+    def postProcessStats(self):
+        pass
+
+    def postProcessFiles(self):
         if self.verbose:
             print('Post-processing %d files' % len(self.file_list))
 
@@ -359,3 +382,11 @@ class GDriveDownloader():
             elif exported_type == 'text/x-markdown':
                 metadata = self.readMeta(meta_file)
                 prepend_markdown_metadata(file_in, file_out, metadata)
+
+    def postProcess(self):
+        if self.stats_only:
+            self.postProcessStats()
+        else:
+            self.postProcessFiles()
+
+
