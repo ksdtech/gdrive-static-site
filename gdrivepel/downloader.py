@@ -28,7 +28,7 @@ GDRIVE_EXPORT_AS = {
     'pdf': 'application/pdf'
 }
 
-STATS_META_FIELDS = [ 'title', 'basename', 'dirname', 'exported_type', 'source_id', 'source_type', 'exported_type' ]
+STATS_META_FIELDS = [ 'title', 'basename', 'dirname', 'source_id', 'source_type', 'exported_type' ]
 
 class GDriveDownloader():
     def __init__(self, maxdepth=1000000, verbose=False, stats_only=False):
